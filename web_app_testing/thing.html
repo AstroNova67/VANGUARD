@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mars Map Demo</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    #map {
+      height: 100vh; /* full screen */
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    // Initialize map
+    var map = L.map('map').setView([0, 0], 2); // lat, lon, zoom
+
+    // Mars basemap (from USGS - Viking Global Mosaic)
+    L.tileLayer("https://planetarymaps.usgs.gov/cgi-bin/mapserv?map=/maps/mars/mars_simp_cyl.map&layer=MDIM21&mode=tile&tilemode=gmap&tile={z}+{x}+{y}", {
+      attribution: 'USGS Astrogeology',
+      maxZoom: 9,
+      tms: true
+    }).addTo(map);
+
+    // Capture click
+    map.on("click", function(e) {
+      var lat = e.latlng.lat.toFixed(4);
+      var lon = e.latlng.lng.toFixed(4);
+      alert("Lat: " + lat + " | Lon: " + lon);
+
+      // Example: send to backend
+      // fetch("http://localhost:5000/predict", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ lat: lat, lon: lon })
+      // });
+    });
+  </script>
+</body>
+</html>
+
+
