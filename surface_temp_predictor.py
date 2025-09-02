@@ -1,22 +1,20 @@
-import os
 import random
-import pandas as pd
-import numpy as np
-from sklearn.metrics import mean_absolute_error
+
+import joblib
+import keras_tuner as kt
 import matplotlib.pyplot as plt
-from scikeras.wrappers import KerasRegressor
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.metrics import r2_score
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
-from sklearn.preprocessing import RobustScaler, StandardScaler
-from joblib import parallel_backend
-from functools import partial
+import numpy as np
+import pandas as pd
 import tensorflow as tf
 from scipy.stats import randint, uniform
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.preprocessing import RobustScaler
 from tensorflow.keras.callbacks import EarlyStopping
-import keras_tuner as kt
-import joblib
+from xgboost import XGBRegressor
+
 SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
@@ -57,6 +55,8 @@ dependent_variable = 'Yearly Average Mars Surface Temperature (C)'
 #
 # print("Combined region dataset saved as 'combined_regions.csv'")
 df = pd.read_csv('datasets/combined_regions.csv')
+
+
 # print(df.isnull().sum())
 # print(df.shape)
 
@@ -68,26 +68,24 @@ class SurfaceTempRegressor:
 
         # Models
         # Best parameters(Forest): {'bootstrap': False, 'max_depth': 19, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 6, 'n_estimators': 123}
-        self.reg_forest = RandomForestRegressor(random_state = 40, n_estimators = 123, bootstrap = False, min_samples_leaf = 2, min_samples_split = 6, max_depth = 19)
-        self.xgb = XGBRegressor(n_estimators = 189, learning_rate = np.float64(0.16159252052077827), max_depth = 9, subsample = np.float64(0.8050838253488191), random_state = 40)
+        self.reg_forest = RandomForestRegressor(random_state=40, n_estimators=123, bootstrap=False, min_samples_leaf=2,
+                                                min_samples_split=6, max_depth=19)
+        self.xgb = XGBRegressor(n_estimators=189, learning_rate=np.float64(0.16159252052077827), max_depth=9,
+                                subsample=np.float64(0.8050838253488191), random_state=40)
         # Best parameters (XGB): {'learning_rate': np.float64(0.16159252052077827), 'max_depth': 9, 'n_estimators': 189, 'subsample': np.float64(0.8050838253488191)}
 
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size = 0.2, random_state = 40)
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size=0.2,
+                                                                                random_state=40)
 
         print(f"x_train shape: {self.x_train.shape}")
         print(f"y_train shape: {self.y_train.shape}")
-
-
 
     def train_models(self):
         self.reg_forest.fit(self.x_train, self.y_train.ravel())
         self.xgb.fit(self.x_train, self.y_train)
 
-
-
     def graph(self):
-
-        plt.figure(figsize = (8, 6))
+        plt.figure(figsize=(8, 6))
 
         # Fallout 3 green for predictions, blue for perfect line, vegas amber for RF
         fallout_green = '#00FF66'
@@ -95,10 +93,10 @@ class SurfaceTempRegressor:
         vegas_amber = '#FFBF00'
 
         # Scatter plot: XGBoost
-        plt.scatter(self.y_test, self.y_pred_xgb, color = fallout_green, alpha=0.4, label='XGBoost Predictions')
+        plt.scatter(self.y_test, self.y_pred_xgb, color=fallout_green, alpha=0.4, label='XGBoost Predictions')
 
         # Scatter plot: Random Forest
-        plt.scatter(self.y_test, self.y_pred_forest, color = vegas_amber, alpha=0.4, label='Random Forest Predictions')
+        plt.scatter(self.y_test, self.y_pred_forest, color=vegas_amber, alpha=0.4, label='Random Forest Predictions')
 
         # Perfect prediction line
         min_val = min(self.y_test.min(), self.y_pred_xgb.min(), self.y_pred_forest.min())
@@ -144,14 +142,14 @@ class SurfaceTempRegressor:
         )
 
         random_search_xgb = RandomizedSearchCV(
-            estimator = self.xgb,
+            estimator=self.xgb,
             param_distributions=param_dist_xgb,
-            n_iter = 50,
-            cv = 5,
-            scoring = 'r2',
-            verbose = 1,
-            random_state = 42,
-            n_jobs = -1
+            n_iter=50,
+            cv=5,
+            scoring='r2',
+            verbose=1,
+            random_state=42,
+            n_jobs=-1
         )
 
         # Fit the random search to the data
@@ -165,7 +163,6 @@ class SurfaceTempRegressor:
         best_model_forest = random_search_forest.best_estimator_
 
         # Evaluate
-
 
         y_pred_best_xgb = best_model_xgb.predict(self.x_test)
         y_pred_best_forest = best_model_forest.predict(self.x_test)
@@ -199,7 +196,6 @@ class SurfaceTempRegressor:
         print("Models loaded successfully")
 
     def print_score(self, z):
-
         score_labels = [
             "Baseline Random Forest",
             "Baseline XGBoost",
@@ -209,7 +205,6 @@ class SurfaceTempRegressor:
 
         y_pred_forest = self.reg_forest.predict(self.x_test).flatten()
         y_pred_xgb = self.xgb.predict(self.x_test).flatten()
-
 
         array = [
             r2_score(self.y_test, y_pred_forest),
@@ -224,8 +219,6 @@ class SurfaceTempRegressor:
         print(f"Score ({label}): {round(score * 100, 3)}%")
 
 
-
-
 class SurfaceTempNetwork:
     def __init__(self, path, target_column, independents,
                  test_size=0.2, random_state=SEED):
@@ -235,7 +228,7 @@ class SurfaceTempNetwork:
         self.test_size = test_size
         self.random_state = random_state
         self.test_original = None
-        self.y_min = None   # store min for inverse shift
+        self.y_min = None  # store min for inverse shift
 
         self.scaler = RobustScaler()
         self.x_train = self.x_test = self.y_train = self.y_test = None
@@ -337,6 +330,7 @@ class SurfaceTempNetwork:
         print(f"Score (Neural Network): {round(r2 * 100, 3)}%")
         print("MAE:", mae)
 
+
 # Instantiate and run
 
 model = SurfaceTempRegressor(df)
@@ -351,9 +345,9 @@ model.print_score(1)
 # model.print_score(3)
 
 model = SurfaceTempNetwork('datasets/combined_regions.csv',
-                       'Yearly Average Mars Surface Temperature (C)',
-                       ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km'],
-                       )
+                           'Yearly Average Mars Surface Temperature (C)',
+                           ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km'],
+                           )
 # model.preprocess()
 # # model.tuner_search()
 # model.load_best_model()
@@ -370,4 +364,3 @@ model = SurfaceTempNetwork('datasets/combined_regions.csv',
 # Score (Baseline XGBoost): 91.12%
 # Score (Grid Search XGBoost): 92.226%
 # Score (Grid Search Random Forest): 92.775%
-

@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-import pandas as pd
 
 
 class LandingSuitabilityScorer:
@@ -29,11 +28,11 @@ class LandingSuitabilityScorer:
         water_score = self.normalize(water, 0, 1, invert=False)
 
         final_score = (
-            slope_score * self.weights["slope"] +
-            dust_score * self.weights["dust"] +
-            temp_score * self.weights["surface_temp"] +
-            inertia_score * self.weights["thermal_inertia"] +
-            water_score * self.weights["water"]
+                slope_score * self.weights["slope"] +
+                dust_score * self.weights["dust"] +
+                temp_score * self.weights["surface_temp"] +
+                inertia_score * self.weights["thermal_inertia"] +
+                water_score * self.weights["water"]
         )
 
         return round(final_score * 100, 2)
@@ -48,11 +47,17 @@ def predict_properties_nn(features):
                and values = trained neural networks
     returns: predicted property values
     """
-    slope_pred = tf.keras.models.load_model('saved_models/neural_nets/slope_pred/best_model.keras').predict(np.array([features]))[0][0]
-    dust_pred = tf.keras.models.load_model('saved_models/neural_nets/dust_predictor/best_model.keras').predict(np.array([features]))[0][0]
-    temp_pred = tf.keras.models.load_model('saved_models/neural_nets/surface_temp_pred/best_model.keras').predict(np.array([features]))[0][0]
-    TI_pred = tf.keras.models.load_model('saved_models/neural_nets/thermal_inertia_predictor/best_model.keras').predict(np.array([features]))[0][0]
-    water_pred = tf.keras.models.load_model('saved_models/neural_nets/water_predictor/best_model.keras').predict(np.array([features]))[0][0]
+    slope_pred = \
+    tf.keras.models.load_model('saved_models/neural_nets/slope_pred/best_model.keras').predict(np.array([features]))[0][
+        0]
+    dust_pred = tf.keras.models.load_model('saved_models/neural_nets/dust_predictor/best_model.keras').predict(
+        np.array([features]))[0][0]
+    temp_pred = tf.keras.models.load_model('saved_models/neural_nets/surface_temp_pred/best_model.keras').predict(
+        np.array([features]))[0][0]
+    TI_pred = tf.keras.models.load_model('saved_models/neural_nets/thermal_inertia_predictor/best_model.keras').predict(
+        np.array([features]))[0][0]
+    water_pred = tf.keras.models.load_model('saved_models/neural_nets/water_predictor/best_model.keras').predict(
+        np.array([features]))[0][0]
 
     return slope_pred, dust_pred, temp_pred, TI_pred, water_pred
 

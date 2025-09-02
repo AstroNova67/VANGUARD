@@ -1,18 +1,15 @@
 import os
 import random
-import pandas as pd
-import numpy as np
-from sklearn.metrics import mean_absolute_error
-# import matplotlib.pyplot as plt
-from scikeras.wrappers import KerasRegressor
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.metrics import r2_score
-from sklearn.preprocessing import RobustScaler, QuantileTransformer
-from joblib import parallel_backend
-from functools import partial
-import tensorflow as tf
-import keras_tuner as kt
 
+import keras_tuner as kt
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import r2_score
+# import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import RobustScaler, QuantileTransformer
 
 SEED = 42
 np.random.seed(SEED)
@@ -20,6 +17,7 @@ random.seed(SEED)
 tf.random.set_seed(SEED)
 print("GPUs:", tf.config.list_physical_devices('GPU'))
 from tensorflow.python.client import device_lib
+
 print(device_lib.list_local_devices())
 
 
@@ -38,7 +36,7 @@ class DustPredictor:
         self.transform = transform
 
         self.scaler = RobustScaler()
-        self.q_transformer = QuantileTransformer(output_distribution='normal') if transform=='quantile' else None
+        self.q_transformer = QuantileTransformer(output_distribution='normal') if transform == 'quantile' else None
 
         self.x_train = self.x_test = self.y_train = self.y_test = None
 
@@ -175,7 +173,7 @@ model = DustPredictor(
     ]
 )
 
-transform = 'quantile'   # choose 'log' or 'quantile'
+transform = 'quantile'  # choose 'log' or 'quantile'
 
 model.preprocess()
 # model.tuner_search()

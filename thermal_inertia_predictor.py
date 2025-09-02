@@ -1,17 +1,16 @@
-import os
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler, RobustScaler, QuantileTransformer
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
-from sklearn.model_selection import train_test_split, cross_val_score, RandomizedSearchCV
-from sklearn.impute import SimpleImputer
-from sklearn.svm import SVR
-import tensorflow as tf
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import keras_tuner as kt
 import joblib
+import keras_tuner as kt
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.preprocessing import RobustScaler, QuantileTransformer
+from sklearn.svm import SVR
+from xgboost import XGBRegressor
 
 # df_red_green = pd.read_csv('datasets/raw_data/Thermal_Inertia/region_red-green.csv')
 # df_blue = pd.read_csv('datasets/raw_data/Thermal_Inertia/region_blue.csv')
@@ -23,14 +22,15 @@ import joblib
 
 df = pd.read_csv('datasets/combined_thermal_inertia_region.csv')
 
-df.dropna(inplace = True)
+df.dropna(inplace=True)
 print(df.isnull().sum())
+
 
 # datasets = [df_red_green, df_blue, df_purple]
 # df = pd.concat(datasets, ignore_index = True)
 # df.to_csv('datasets/combined_thermal_inertia_region.csv')
 
-class  ThermalInertiaPredictor:
+class ThermalInertiaPredictor:
     def __init__(self, dataset):
 
         self.target_transform = 'quantile'
@@ -45,13 +45,13 @@ class  ThermalInertiaPredictor:
             self.y = self.qt_y.fit_transform(self.y.reshape(-1, 1)).ravel()
 
         # split dataset into train and test set
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size = 0.2, random_state = 42)
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size=0.2,
+                                                                                random_state=42)
 
         # Build Models
-        self.xgb = XGBRegressor(random_state = 42)
-        self.reg_svr = SVR(kernel = 'rbf')
-        self.reg_forest = RandomForestRegressor(random_state = 42)
-
+        self.xgb = XGBRegressor(random_state=42)
+        self.reg_svr = SVR(kernel='rbf')
+        self.reg_forest = RandomForestRegressor(random_state=42)
 
         # Feature Scale
         self.sc_x = RobustScaler()
@@ -67,7 +67,7 @@ class  ThermalInertiaPredictor:
         self.reg_svr.fit(self.x_train_scaled, self.y_train_scaled)
         self.reg_forest.fit(self.x_train, self.y_train)
 
-    def random_search(self, n_iter = 100, cv = 5):
+    def random_search(self, n_iter=100, cv=5):
         print("Running Randomized Search for hyperparameters...")
 
         # Parameter grids
@@ -114,7 +114,7 @@ class  ThermalInertiaPredictor:
         self.reg_svr = rs_svr.best_estimator_
         self.reg_forest = rs_forest.best_estimator_
 
-    def plot_histogram(self, bins=10, title="Histogram", xlabel = 'Thermal Inertia', ylabel= 'Density', color = "skyblue"):
+    def plot_histogram(self, bins=10, title="Histogram", xlabel='Thermal Inertia', ylabel='Density', color="skyblue"):
         """
         Plots a histogram for the given data.
 
@@ -162,16 +162,14 @@ class  ThermalInertiaPredictor:
 
         print("Models loaded successfully")
 
-
-
     def predict(self):
         y_pred_xgb = self.xgb.predict(self.x_test)
         y_pred_forest = self.reg_forest.predict(self.x_test)
 
         if self.target_transform == 'quantile':
-             y_test_original = self.qt_y.inverse_transform(self.y_test.reshape(-1, 1)).ravel()
-             y_pred_xgb = self.qt_y.inverse_transform(y_pred_xgb.reshape(-1, 1)).ravel()
-             y_pred_forest = self.qt_y.inverse_transform(y_pred_forest.reshape(-1, 1)).ravel()
+            y_test_original = self.qt_y.inverse_transform(self.y_test.reshape(-1, 1)).ravel()
+            y_pred_xgb = self.qt_y.inverse_transform(y_pred_xgb.reshape(-1, 1)).ravel()
+            y_pred_forest = self.qt_y.inverse_transform(y_pred_forest.reshape(-1, 1)).ravel()
         elif self.target_transform == 'log':
             y_test_original = np.expm1(self.y_test)
             y_pred_xgb = np.expm1(y_pred_xgb)
@@ -188,7 +186,6 @@ class  ThermalInertiaPredictor:
 
 class ThermalInertiaNeuralNetwork:
     def __init__(self, dataset):
-
         self.x = dataset.iloc[:, :-1].values
         self.y = dataset.iloc[:, -1].values
 
@@ -197,16 +194,14 @@ class ThermalInertiaNeuralNetwork:
 
         # Split data
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
-            self.x, self.y, test_size = 0.2, random_state = 42
+            self.x, self.y, test_size=0.2, random_state=42
         )
 
     def preprocessing(self):
-
         # Feature scale
         self.x_train = self.qt_x.fit_transform(self.x_train)
         self.x_test = self.qt_x.transform(self.x_test)
         self.y_train = self.qt_y.fit_transform(self.y_train.reshape(-1, 1))
-
 
     def _model_builder(self, hp):
         network = tf.keras.Sequential()
@@ -227,7 +222,7 @@ class ThermalInertiaNeuralNetwork:
 
         network.add(tf.keras.layers.Dense(units=1))
         network.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=hp_learning_rate),
-                      loss=tf.keras.losses.MeanSquaredError(), metrics=['mae'])
+                        loss=tf.keras.losses.MeanSquaredError(), metrics=['mae'])
         return network
 
     def tuner_search(self):
@@ -249,7 +244,6 @@ class ThermalInertiaNeuralNetwork:
 
         # prediction on transformed
         y_pred_transformed = network.predict(self.x_test)  # No inverse_transform here
-
 
         y_pred = self.qt_y.inverse_transform(y_pred_transformed).ravel()
 
@@ -277,6 +271,7 @@ class ThermalInertiaNeuralNetwork:
         #
         # print(self.qt_y.inverse_transform(prediction).ravel())
 
+
 # network = ThermalInertiaNeuralNetwork(df)
 # network.preprocessing()
 # network.load_best_model()
@@ -288,7 +283,6 @@ model = ThermalInertiaPredictor(df)
 # model.save_model()
 model.load_model()
 model.predict()
-
 
 # Metrics
 

@@ -1,17 +1,14 @@
-import pandas as pd
+import keras_tuner as kt
+import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.preprocessing import StandardScaler, RobustScaler
+import pandas as pd
 import tensorflow as tf
+from scipy.stats import randint, uniform
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import RobustScaler
 from xgboost import XGBRegressor
-from sklearn.impute import SimpleImputer
-from scipy.stats import randint, uniform
-import matplotlib.pyplot as plt
-import keras_tuner as kt
-import joblib
-
 
 df_white = pd.read_csv('datasets/raw_data/Slope_Prediction_Dataset/Region_White.csv')
 df_gray = pd.read_csv('datasets/raw_data/Slope_Prediction_Dataset/Region_Gray.csv')
@@ -52,7 +49,9 @@ df_black = pd.read_csv('datasets/raw_data/Slope_Prediction_Dataset/Region_Black.
 df = pd.read_csv('datasets/combined_slope_regions.csv')
 
 df['Slope_Log'] = np.log1p(df['Slope (degrees)'])
-independent_variables = ['Albedo','Day Side Thermal Inertia','Roughness','OMEGA Ferric/Dust 860nm ratio','Elevation_rolling_mean','Elevation_rolling_max_diff','Elevation_diff_abs','Elevation_diff2_abs']
+independent_variables = ['Albedo', 'Day Side Thermal Inertia', 'Roughness', 'OMEGA Ferric/Dust 860nm ratio',
+                         'Elevation_rolling_mean', 'Elevation_rolling_max_diff', 'Elevation_diff_abs',
+                         'Elevation_diff2_abs']
 dependent_variable = ['Slope_Log']
 
 
@@ -62,10 +61,10 @@ class SlopeNeuralNetwork:
         self.y = datasets[dependent_variable].values
         self.test_original = None
 
-    def preprocessing(self, test_size = 0.2, random_state=42):
+    def preprocessing(self, test_size=0.2, random_state=42):
         # Split data
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(
-            self.x, self.y, test_size = test_size, random_state = random_state
+            self.x, self.y, test_size=test_size, random_state=random_state
         )
         self.test_original = self.y_test.copy()
         # Feature scale inputs
@@ -119,6 +118,7 @@ class SlopeNeuralNetwork:
         print(f'Score (Neural Network Tuned): {round(score_neural * 100, 3)}%')
         print(f'MAE: {round(mae, 3)}')
 
+
 class SlopeRegressor:
     def __init__(self, datasets):
         self.x = datasets[independent_variables].values
@@ -127,7 +127,8 @@ class SlopeRegressor:
 
     def preprocessing(self):
         # split data
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size = 0.2, random_state = 42)
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(self.x, self.y, test_size=0.2,
+                                                                                random_state=42)
 
         # Feature Scale (not required here)
         # self.sc = StandardScaler()
@@ -135,23 +136,24 @@ class SlopeRegressor:
         # self.x_test = self.sc.transform(self.x_test)
 
     def train(self):
-       self.reg_forest = RandomForestRegressor(n_estimators = 200, random_state = 42)
-       # Best parameters (Forest): {'bootstrap': False, 'max_depth': 19, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 6, 'n_estimators': 123}
+        self.reg_forest = RandomForestRegressor(n_estimators=200, random_state=42)
+        # Best parameters (Forest): {'bootstrap': False, 'max_depth': 19, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 6, 'n_estimators': 123}
 
-       self.xgb = XGBRegressor(n_estimators = 195, learning_rate = 0.04128851382805829, max_depth = 9, subsample = 0.9272820822527561, random_state = 42)
-       # Best parameters (XGB): {'learning_rate': 0.04128851382805829, 'max_depth': 9, 'n_estimators': 195, 'subsample': 0.9272820822527561}
+        self.xgb = XGBRegressor(n_estimators=195, learning_rate=0.04128851382805829, max_depth=9,
+                                subsample=0.9272820822527561, random_state=42)
+        # Best parameters (XGB): {'learning_rate': 0.04128851382805829, 'max_depth': 9, 'n_estimators': 195, 'subsample': 0.9272820822527561}
 
-       self.reg_forest.fit(self.x_train, self.y_train)
-       self.xgb.fit(self.x_train, self.y_train)
+        self.reg_forest.fit(self.x_train, self.y_train)
+        self.xgb.fit(self.x_train, self.y_train)
 
-       # used to check feature importance
-       # importances = self.reg_forest.feature_importances_
-       # features = independent_variables
-       # sorted_idx = np.argsort(importances)[::-1]
-       #
-       # print("\nFeature Importances (Random Forest):")
-       # for i in sorted_idx:
-       #     print(f"{features[i]}: {importances[i]:.4f}")
+        # used to check feature importance
+        # importances = self.reg_forest.feature_importances_
+        # features = independent_variables
+        # sorted_idx = np.argsort(importances)[::-1]
+        #
+        # print("\nFeature Importances (Random Forest):")
+        # for i in sorted_idx:
+        #     print(f"{features[i]}: {importances[i]:.4f}")
 
     def random_search(self):
         self.counter = 1
@@ -174,28 +176,28 @@ class SlopeRegressor:
 
         # Set up the random search
         random_search_forest = RandomizedSearchCV(
-            estimator = self.reg_forest,
-            param_distributions = param_dist_forest,
-            n_iter = 50,  # Number of random combinations to try
-            cv = 3,
-            scoring = 'r2',
+            estimator=self.reg_forest,
+            param_distributions=param_dist_forest,
+            n_iter=50,  # Number of random combinations to try
+            cv=3,
+            scoring='r2',
             verbose=1,
-            random_state = 42,
-            n_jobs = -1
+            random_state=42,
+            n_jobs=-1
         )
 
         random_search_xgb = RandomizedSearchCV(
-            estimator = self.xgb,
-            param_distributions = param_dist_xgb,
-            n_iter = 50,
-            cv = 5,
-            scoring = 'r2',
-            verbose = 1,
-            random_state = 42,
-            n_jobs = -1
+            estimator=self.xgb,
+            param_distributions=param_dist_xgb,
+            n_iter=50,
+            cv=5,
+            scoring='r2',
+            verbose=1,
+            random_state=42,
+            n_jobs=-1
         )
 
-            # Fit the random search to the data
+        # Fit the random search to the data
         random_search_xgb.fit(self.x_train, self.y_train.ravel())
         random_search_forest.fit(self.x_train, self.y_train.ravel())
 
@@ -206,7 +208,6 @@ class SlopeRegressor:
         best_model_forest = random_search_forest.best_estimator_
 
         # Evaluate
-
 
         y_pred_best_xgb = best_model_xgb.predict(self.x_test)
         y_pred_best_forest = best_model_forest.predict(self.x_test)
@@ -237,7 +238,6 @@ class SlopeRegressor:
                 print(f'Score (XGBoost Tuned): {round(array_best[index] * 100, 3)}%')
 
 
-
 model = SlopeNeuralNetwork(df)
 model.preprocessing()
 # model.tuner_search()
@@ -259,5 +259,3 @@ model.load_best_model()
 # Score (XGBoost): 82.097%
 # Best parameters (XGB): {'learning_rate': 0.04128851382805829, 'max_depth': 9, 'n_estimators': 195, 'subsample': 0.9272820822527561}
 # Best parameters (Forest): {'bootstrap': False, 'max_depth': 19, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 6, 'n_estimators': 123}
-
-

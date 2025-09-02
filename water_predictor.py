@@ -1,18 +1,15 @@
-import os
 import random
-import pandas as pd
-import numpy as np
-from sklearn.metrics import mean_absolute_error
-import matplotlib.pyplot as plt
-from scikeras.wrappers import KerasRegressor
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.metrics import r2_score
-from sklearn.preprocessing import RobustScaler
-from joblib import parallel_backend
-from functools import partial
-import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping
+
 import keras_tuner as kt
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import RobustScaler
+from tensorflow.keras.callbacks import EarlyStopping
+
 SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
@@ -33,7 +30,6 @@ class WaterPredictor:
         self.x_train = self.x_test = self.y_train = self.y_test = None
 
     def preprocess(self):
-
         df = pd.read_csv(self.path)
         df.dropna(inplace=True)  # Remove missing rows
 
@@ -42,8 +38,8 @@ class WaterPredictor:
         x = df[self.independents].values
         y = df[self.target_column].values
 
-
-        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=self.test_size, random_state=self.random_state)
+        self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x, y, test_size=self.test_size,
+                                                                                random_state=self.random_state)
 
         self.test_original = self.y_test.copy()
 
@@ -67,7 +63,8 @@ class WaterPredictor:
             model.add(tf.keras.layers.Dense(units=units, activation=hp_activation))
 
         model.add(tf.keras.layers.Dense(units=1))
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=hp_learning_rate),loss=tf.keras.losses.MeanSquaredError(), metrics=['mae'])
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=hp_learning_rate),
+                      loss=tf.keras.losses.MeanSquaredError(), metrics=['mae'])
         return model
 
     def tuner_search(self):
@@ -84,7 +81,7 @@ class WaterPredictor:
         print("Best hyperparameters:", best_hps)
 
         model = tuner.hypermodel.build(best_hps)
-        model.fit(self.x_train, self.y_train, epochs = 250, validation_split=0.2, callbacks=[stop_early])
+        model.fit(self.x_train, self.y_train, epochs=250, validation_split=0.2, callbacks=[stop_early])
         model.save('neural_nets/water_predictor/best_model.keras')
 
         y_pred = model.predict(self.x_test).flatten()
@@ -103,7 +100,8 @@ class WaterPredictor:
         print("R2:", r2)
         print("MAE:", mae)
 
-#Usage
+
+# Usage
 model = WaterPredictor(
     "datasets/water_WEH_%.csv",
     'Mars Odyssey Neutron Spectrometer % WEH',
@@ -119,5 +117,5 @@ model = WaterPredictor(
     ]
 )
 model.preprocess()
-#model.tuner_search()
+# model.tuner_search()
 model.load_best_model()
