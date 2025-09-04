@@ -1,0 +1,24 @@
+{
+  "name": "3d_globe",
+  "version": "1.0.0",
+  "description": "This repository contains a simple Three.js application that renders a 3D globe. It displays feature outlines on a sphere, surrounded by a starfield, and offers simple user interaction (orbit controls).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bobbyroe/3d-globe-with-threejs.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/bobbyroe/3d-globe-with-threejs/issues"
+  },
+  "homepage": "https://github.com/bobbyroe/3d-globe-with-threejs#readme",
+  "dependencies": {
+    "three": "^0.179.1"
+  }
+}
