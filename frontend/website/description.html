@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NovaScope - Module Descriptions</title>
+  <style>
+    body {
+      margin:0;
+      font-family: Arial, sans-serif;
+      background-color:#121212;
+      color:#E0E0E0;
+      background-image: url('https://images.unsplash.com/photo-1581328182483-5b92dbd1f0c4?fit=crop&w=1600&q=80');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+    body::before {
+      content:'';
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background-color:#121212; opacity:0.86; z-index:-1;
+    }
+
+    header {
+      padding: 40px 20px;
+      font-size: 2.5rem;
+      font-weight:bold;
+      text-align:center;
+    }
+
+    /* Fixed Back to Home Button */
+    .back-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 12px 25px;
+      background-color: #FF4C4C;
+      color:white;
+      font-size: 1rem;
+      border:none;
+      border-radius: 8px;
+      text-decoration: none;
+      display:flex;
+      align-items:center;
+      gap: 5px;
+      z-index: 1000;
+      transition: 0.3s;
+      box-shadow: 0 0 10px #FF4C4C;
+    }
+    .back-btn:hover {
+      background-color:#FF6666;
+      box-shadow: 0 0 20px #FF6666;
+    }
+
+    .container {
+      display: flex;
+      max-width: 1200px;
+      margin: 80px auto;
+      gap: 50px;
+      padding: 0 20px;
+    }
+
+    .left-content {
+      flex: 1;
+    }
+
+    .right-content {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: rgba(26,26,26,0.7);
+      border-radius: 12px;
+      min-height: 300px;
+      color: #AAA;
+      font-style: italic;
+      box-shadow: 0 0 15px rgba(255,255,255,0.1);
+    }
+
+    .tabs {
+      display:flex;
+      gap:10px;
+      margin-bottom:20px;
+    }
+    .tab {
+      padding:10px 20px;
+      border-radius:8px;
+      cursor:pointer;
+      transition:0.3s;
+      background-color:#1A1A1A;
+      box-shadow: 0 0 5px #000;
+    }
+
+    /* Active tab color (RedPoint orange) */
+    .tab[data-tab="redpoint"].active {
+      background-color:#FFAA33;
+      color:white;
+      box-shadow: 0 0 15px #FFAA33;
+    }
+
+    .tab:hover {
+      background-color:#3B1E1E;
+      box-shadow: 0 0 15px #FFAA33;
+    }
+
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active { display: block; }
+
+    h2 {
+      color:#FF6666;
+      margin-bottom: 15px;
+    }
+    p { margin-bottom:15px; line-height:1.6; }
+  </style>
+</head>
+<body>
+  <a class="back-btn" href="website.html">&#8592; Back to Home</a>
+
+  <header>NovaScope Modules - Description</header>
+
+  <div class="container">
+    <!-- Left: Module Descriptions -->
+    <div class="left-content">
+      <div class="tabs">
+        <div class="tab active" data-tab="redpoint">RedPoint (Mars)</div>
+        <!-- Add more module tabs here -->
+      </div>
+
+      <div class="tab-content active" id="redpoint">
+        <h2>RedPoint - Mars Module</h2>
+        <p><strong>Landing Spots:</strong> Visualize potential landing spots and safety scores.</p>
+        <p><strong>Terrain Analysis:</strong> Analyze slopes, obstacles, and terrain features using ML models.</p>
+        <p><strong>Model Dashboard:</strong> Inspect model predictions and scoring metrics.</p>
+      </div>
+    </div>
+
+    <!-- Right: Placeholder for video examples -->
+    <div class="right-content">
+      Video / Example Preview
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    const tabs = document.querySelectorAll('.tab');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        contents.forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
+
+
