@@ -7,18 +7,51 @@
     <style>
       body {
         margin: 0;
-        overflow: hidden;
+        overflow: hidden; /* keep canvas fullscreen */
+        font-family: sans-serif;
+        color: white;
       }
-      #coords {
+      #controls {
         position: absolute;
         top: 10px;
         left: 10px;
-        color: white;
         background: rgba(0, 0, 0, 0.5);
-        padding: 6px 10px;
-        border-radius: 6px;
-        font-family: monospace;
+        padding: 10px;
+        border-radius: 8px;
+      }
+      #coords {
+        margin-top: 10px;
         font-size: 14px;
+      }
+      /* === Red Slider Styling === */
+      #sunAngle {
+        -webkit-appearance: none;
+        width: 150px;
+        height: 8px;
+        background: #ff4d4d; /* red track */
+        border-radius: 5px;
+        outline: none;
+        cursor: pointer;
+      }
+      /* Thumb for Chrome/Safari */
+      #sunAngle::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: red;
+        cursor: pointer;
+        border: none;
+      }
+      /* Thumb for Firefox */
+      #sunAngle::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: red;
+        cursor: pointer;
+        border: none;
       }
     </style>
     <script type="importmap">
@@ -31,7 +64,17 @@
     </script>
   </head>
   <body>
-    <div id="coords">Click Mars to get Lat/Long</div>
+    <!-- 🌞 UI Controls for Shadow -->
+    <div id="controls">
+      <button id="toggleSun">Toggle Sun Rotation</button><br><br>
+      <label for="sunAngle">Sun Angle:</label>
+      <input id="sunAngle" type="range" min="0" max="360" value="0">
+
+      <!-- Latitude and Longitude Display -->
+      <div id="coords">Lat: ---, Lon: ---</div>
+    </div>
+
+    <!-- Your Three.js script -->
     <script type="module" src="index.js"></script>
   </body>
 </html>

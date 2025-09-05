@@ -7,8 +7,8 @@ const w = window.innerWidth;
 const h = window.innerHeight;
 const scene = new THREE.Scene();
 
-// Fog
-scene.fog = new THREE.FogExp2(0x000000, 0.1);
+// Fog don't use for now
+// scene.fog = new THREE.FogExp2(0x000000, 0.1);
 
 const camera = new THREE.PerspectiveCamera(75, w / h, 1, 100);
 camera.position.z = 5;
@@ -50,20 +50,10 @@ const line = new THREE.LineSegments(edges, lineMat);
 const stars = getStarfield({ numStars: 1000, fog: false });
 scene.add(stars);
 
-// Add lights (needed for MeshPhongMaterial)
-// const light = new THREE.DirectionalLight(0xffffff, 2);
-// light.position.set(5, 5, 5);
-// scene.add(light);
-// scene.add(new THREE.AmbientLight(0x404040));
-
-
 // Sun Light setup
 const sunLight = new THREE.DirectionalLight(0xffffff, 1);
 sunLight.castShadow = true;
 sunLight.position.set(50, 0, 0);
-
-// const sunHelper = new THREE.DirectionalLightHelper(sunLight, 5);
-// scene.add(sunHelper);
 
 sunLight.target.position.set(0, 0, 0);
 scene.add(sunLight.target);
@@ -72,45 +62,49 @@ const sunPivot = new THREE.Object3D();
 scene.add(sunPivot);
 sunPivot.add(sunLight);
 
-// const light2 = new THREE.DirectionalLight(0xffffff, 3);
-// light2.position.set(-5, -5, -5);
-// scene.add(light2);
-
-
-// Load countries from geojson
-// fetch('./geojson/ne_110m_land.json')
-//   .then(response => response.text())
-//   .then(text => {
-//     const data = JSON.parse(text);
-//     const countries = drawThreeGeo({
-//       json: data,
-//       radius: 2,
-//       materialOptions: {
-//         color: 0x80FF80,
-//       },
-//     });
-//     scene.add(countries);
-//   });
-
 // Visible Sun Mesh
-const sunGeometry = new THREE.SphereGeometry(0.5, 32, 32); // smaller than Mars
+const sunGeometry = new THREE.SphereGeometry(0.5, 32, 32);
 const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
-
-// put the sun mesh in the same spot as the light
 sunMesh.position.set(50, 0, 0);
-
-// attach to pivot so it orbits with the light
 sunPivot.add(sunMesh);
 
+// === NEW: UI state ===
+let sunRotationEnabled = true; // button toggles this
+const distance = 50;           // radius of sun orbit
+
+// Hook up button
+const toggleBtn = document.getElementById("toggleSun");
+toggleBtn.addEventListener("click", () => {
+  sunRotationEnabled = !sunRotationEnabled;
+});
+
+// Hook up slider
+const sunSlider = document.getElementById("sunAngle");
+sunSlider.addEventListener("input", (e) => {
+  const angle = THREE.MathUtils.degToRad(e.target.value);
+
+  // place sun/light manually
+  sunMesh.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+  sunLight.position.copy(sunMesh.position);
+
+  // when slider is used, freeze auto-rotation
+  sunRotationEnabled = false;
+});
+
+// Animate
 function animate() {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
   controls.update();
-  sunPivot.rotation.y += 0.002; // orbit speed
+
+  if (sunRotationEnabled) {
+    sunPivot.rotation.y += 0.002; // orbit speed
+  }
 }
 animate();
 
+// Resize
 function handleWindowResize () {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -123,10 +117,7 @@ const markerGeomertry = new THREE.SphereGeometry(0.05, 16, 16);
 const markerMaterial = new THREE.MeshBasicMaterial({color: 'red'});
 const marker = new THREE.Mesh(markerGeomertry, markerMaterial);
 scene.add(marker);
-
-// Hide maker until first click
-marker.visible = false;
-
+marker.visible = false; // hidden until first click
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -157,7 +148,4 @@ function onMouseClick(event) {
     marker.visible = true;
   }
 }
-
-
 window.addEventListener("click", onMouseClick, false);
-
