@@ -1,4 +1,4 @@
-Copyright 2025 Eshaan Khare
+Copyright 2025 AstroNova
 
 All code, data, and materials in this repository are the property of Eshaan Khare.  
 Contributors may make changes for this project only.  
