@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Three.js + GeoJSON</title>
+    <title>Mars Explorer</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔴</text></svg>">
     <style>
       body {
         margin: 0;
@@ -16,12 +17,31 @@
         top: 10px;
         left: 10px;
         background: rgba(0, 0, 0, 0.5);
-        padding: 10px;
+        padding: 10px 14px;
         border-radius: 8px;
       }
+      #controls button {
+        background: #333;
+        color: white;
+        border: 1px solid #666;
+        border-radius: 6px;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      #controls button:hover {
+        background: #444;
+      }
       #coords {
-        margin-top: 10px;
-        font-size: 14px;
+        margin-top: 12px;
+        font-size: 12px;
+        line-height: 1.3;
+        white-space: pre-line; /* allows newlines */
+        max-height: 400px;
+        overflow-y: auto;
+        background: rgba(0, 0, 0, 0.3);
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #444;
       }
       /* === Red Slider Styling === */
       #sunAngle {
@@ -33,7 +53,6 @@
         outline: none;
         cursor: pointer;
       }
-      /* Thumb for Chrome/Safari */
       #sunAngle::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
@@ -44,7 +63,6 @@
         cursor: pointer;
         border: none;
       }
-      /* Thumb for Firefox */
       #sunAngle::-moz-range-thumb {
         width: 16px;
         height: 16px;
@@ -54,26 +72,38 @@
         border: none;
       }
     </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.170/build/three.module.js",
-          "jsm/": "https://cdn.jsdelivr.net/npm/three@0.170/examples/jsm/"
-        }
-      }
-    </script>
+
+    <!-- Import maps for modules -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.179/build/three.module.js",
+    "jsm/": "https://cdn.jsdelivr.net/npm/three@0.179/examples/jsm/",
+    "@petamoriken/float16": "https://cdn.jsdelivr.net/npm/@petamoriken/float16@3.8.7/browser/float16.js",
+    "xml-utils": "https://cdn.jsdelivr.net/npm/xml-utils@1.10.2/index.mjs",
+    "xml-utils/": "https://cdn.jsdelivr.net/npm/xml-utils@1.10.2/"
+  }
+}
+</script>
+
   </head>
   <body>
-    <!-- 🌞 UI Controls for Shadow -->
+    <!-- 🌞 UI Controls for Sun + Data -->
     <div id="controls">
       <button id="toggleSun">Toggle Sun Rotation</button><br><br>
       <label for="sunAngle">Sun Angle:</label>
       <input id="sunAngle" type="range" min="0" max="360" value="0">
 
-      <!-- Latitude and Longitude Display -->
-      <div id="coords">Lat: ---, Lon: ---</div>
+      <!-- Mars Data Display -->
+      <div id="coords">Click anywhere on Mars to see all dataset values</div>
+      
+      <!-- Landing Suitability Prediction -->
+      <button id="predictLanding" style="margin-top: 10px; display: none;">Predict Landing Suitability</button>
+      <div id="landingScore" style="margin-top: 10px; font-weight: bold; color: #4CAF50;"></div>
     </div>
 
+    <!-- Load GeoTIFF as global -->
+    <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     <!-- Your Three.js script -->
     <script type="module" src="index.js"></script>
   </body>

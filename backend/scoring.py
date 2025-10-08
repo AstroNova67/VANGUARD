@@ -62,14 +62,14 @@ def predict_properties_nn(features):
     return slope_pred, dust_pred, temp_pred, TI_pred, water_pred
 
 
-# Example usage
+# Example usage (commented out to prevent execution on import)
 # nn_models = {"slope": slope_nn, "dust": dust_nn, "temp": temp_nn, ...}
 # features_for_point = [/* your input features at the clicked location */]
 
 # Predict values from neural networks
-pred_slope, pred_dust, pred_temp, pred_TI, pred_water = predict_properties_nn()
+# pred_slope, pred_dust, pred_temp, pred_TI, pred_water = predict_properties_nn(features_for_point)
 
 # Compute landing score
-scorer = LandingSuitabilityScorer()
-landing_score = scorer.score_site(pred_slope, pred_dust, pred_temp, pred_TI, pred_water)
-print(f"Predicted Landing Score (NN-based): {landing_score}%")
+# scorer = LandingSuitabilityScorer()
+# landing_score = scorer.score_site(pred_slope, pred_dust, pred_temp, pred_TI, pred_water)
+# print(f"Predicted Landing Score (NN-based): {landing_score}%")

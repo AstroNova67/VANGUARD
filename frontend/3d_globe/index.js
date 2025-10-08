@@ -1,14 +1,11 @@
 import * as THREE from "three";
-import { OrbitControls } from 'jsm/controls/OrbitControls.js';
+import { OrbitControls } from "jsm/controls/OrbitControls.js";
 import getStarfield from "./src/getStarfield.js";
-import { drawThreeGeo } from "./src/threeGeoJSON.js";
-
+// GeoTIFF is loaded as global script
+// --- Window & Scene Setup ---
 const w = window.innerWidth;
 const h = window.innerHeight;
 const scene = new THREE.Scene();
-
-// Fog don't use for now
-// scene.fog = new THREE.FogExp2(0x000000, 0.1);
 
 const camera = new THREE.PerspectiveCamera(75, w / h, 1, 100);
 camera.position.z = 5;
@@ -20,132 +17,455 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// Sphere geometry
-const geometry = new THREE.SphereGeometry(2, 64, 64);
+// --- Mars Sphere Setup ---
+const marsGeometry = new THREE.SphereGeometry(2, 64, 64);
+const marsTexture = new THREE.TextureLoader().load("./textures/mars_8k.jpg");
+const marsMaterial = new THREE.MeshPhongMaterial({ map: marsTexture });
+const marsSphere = new THREE.Mesh(marsGeometry, marsMaterial);
+scene.add(marsSphere);
 
-// Load Mars texture
-const textureLoader = new THREE.TextureLoader();
-const marsTexture = textureLoader.load("./textures/mars_8k.jpg");
+// Optional Wireframe
+const wireframe = new THREE.LineSegments(
+  new THREE.EdgesGeometry(marsGeometry),
+  new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.4, transparent: true })
+);
+// scene.add(wireframe); // Uncomment to display wireframe
 
-// Apply texture to material
-const sphereMaterial = new THREE.MeshPhongMaterial({
-  map: marsTexture,
-});
-
-// Create mesh
-const sphere = new THREE.Mesh(geometry, sphereMaterial);
-scene.add(sphere);
-
-// White outline edges (optional)
-const lineMat = new THREE.LineBasicMaterial({
-  color: 0xffffff,
-  transparent: true,
-  opacity: 0.4,
-});
-const edges = new THREE.EdgesGeometry(geometry, 1);
-const line = new THREE.LineSegments(edges, lineMat);
-// scene.add(line); // uncomment if you want the wireframe
-
-// Add stars
+// --- Stars ---
 const stars = getStarfield({ numStars: 1000, fog: false });
 scene.add(stars);
 
-// Sun Light setup
-const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-sunLight.castShadow = true;
-sunLight.position.set(50, 0, 0);
-
-sunLight.target.position.set(0, 0, 0);
-scene.add(sunLight.target);
-
+// --- Sun Setup ---
 const sunPivot = new THREE.Object3D();
 scene.add(sunPivot);
+
+const sunDistance = 50;
+let sunRotationEnabled = true;
+
+const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+sunLight.position.set(sunDistance, 0, 0);
+sunLight.target.position.set(0, 0, 0);
+scene.add(sunLight.target);
 sunPivot.add(sunLight);
 
-// Visible Sun Mesh
-const sunGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
-sunMesh.position.set(50, 0, 0);
+const sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 32, 32),
+  new THREE.MeshBasicMaterial({ color: 0xffff00 })
+);
+sunMesh.position.set(sunDistance, 0, 0);
 sunPivot.add(sunMesh);
 
-// === NEW: UI state ===
-let sunRotationEnabled = true; // button toggles this
-const distance = 50;           // radius of sun orbit
-
-// Hook up button
-const toggleBtn = document.getElementById("toggleSun");
-toggleBtn.addEventListener("click", () => {
+// --- UI Controls ---
+document.getElementById("toggleSun").addEventListener("click", () => {
   sunRotationEnabled = !sunRotationEnabled;
 });
 
-// Hook up slider
-const sunSlider = document.getElementById("sunAngle");
-sunSlider.addEventListener("input", (e) => {
+document.getElementById("sunAngle").addEventListener("input", (e) => {
   const angle = THREE.MathUtils.degToRad(e.target.value);
-
-  // place sun/light manually
-  sunMesh.position.set(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+  sunMesh.position.set(Math.cos(angle) * sunDistance, 0, Math.sin(angle) * sunDistance);
   sunLight.position.copy(sunMesh.position);
-
-  // when slider is used, freeze auto-rotation
   sunRotationEnabled = false;
 });
 
-// Animate
+// Landing suitability prediction
+async function predictLandingSuitability() {
+  if (!currentMarsData) {
+    alert("Please click on Mars first to get data");
+    return;
+  }
+  
+  try {
+    document.getElementById("landingScore").innerText = "🔄 Predicting landing suitability...";
+    document.getElementById("predictLanding").disabled = true;
+    
+    const response = await fetch('http://localhost:5002/predict', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(currentMarsData)
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      const score = result.landing_score;
+      let scoreColor = '#4CAF50'; // Green
+      let scoreText = 'Excellent';
+      
+      if (score < 30) {
+        scoreColor = '#f44336'; // Red
+        scoreText = 'Poor';
+      } else if (score < 50) {
+        scoreColor = '#ff9800'; // Orange
+        scoreText = 'Fair';
+      } else if (score < 70) {
+        scoreColor = '#ffeb3b'; // Yellow
+        scoreText = 'Good';
+      }
+      
+      document.getElementById("landingScore").innerHTML = `
+        <div style="color: ${scoreColor}; font-size: 18px;">
+          🚀 Landing Suitability: ${score}% (${scoreText})
+        </div>
+        <div style="font-size: 12px; margin-top: 5px;">
+          Neural Network Predictions:<br>
+          • Slope: ${result.predictions.neural_networks.slope?.toFixed(2) || 'N/A'}<br>
+          • Dust: ${result.predictions.neural_networks.dust?.toFixed(2) || 'N/A'}<br>
+          • Surface Temp: ${result.predictions.neural_networks.surface_temp?.toFixed(2) || 'N/A'}°C<br>
+          • Thermal Inertia: ${result.predictions.neural_networks.thermal_inertia?.toFixed(2) || 'N/A'}<br>
+          • Water: ${result.predictions.neural_networks.water?.toFixed(2) || 'N/A'}
+        </div>
+      `;
+      
+      console.log("Prediction result:", result);
+    } else {
+      document.getElementById("landingScore").innerText = `❌ Error: ${result.error}`;
+    }
+    
+  } catch (error) {
+    console.error("API call failed:", error);
+    document.getElementById("landingScore").innerText = `❌ Failed to connect to API: ${error.message}`;
+  } finally {
+    document.getElementById("predictLanding").disabled = false;
+  }
+}
+
+// Event listener for prediction button
+document.getElementById("predictLanding").addEventListener("click", predictLandingSuitability);
+
+// --- Animate Loop ---
 function animate() {
   requestAnimationFrame(animate);
-  renderer.render(scene, camera);
   controls.update();
-
-  if (sunRotationEnabled) {
-    sunPivot.rotation.y += 0.002; // orbit speed
-  }
+  renderer.render(scene, camera);
+  if (sunRotationEnabled) sunPivot.rotation.y += 0.002;
 }
 animate();
 
-// Resize
-function handleWindowResize () {
+// --- Handle Window Resize ---
+window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-}
-window.addEventListener('resize', handleWindowResize, false);
+});
 
-// Marker for clicked location
-const markerGeomertry = new THREE.SphereGeometry(0.05, 16, 16);
-const markerMaterial = new THREE.MeshBasicMaterial({color: 'red'});
-const marker = new THREE.Mesh(markerGeomertry, markerMaterial);
+// --- Marker Setup ---
+const marker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.05, 16, 16),
+  new THREE.MeshBasicMaterial({ color: "red" })
+);
+marker.visible = false;
 scene.add(marker);
-marker.visible = false; // hidden until first click
 
+// --- Raycasting ---
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-function onMouseClick(event) {
+// --- Mars Datasets Configuration ---
+const marsDatasets = {
+  elevation: {
+    name: "Elevation (MOLA)",
+    file: "./public/data/MOLA_128ppd_topo.tif",
+    unit: "m",
+    description: "Mars Orbiter Laser Altimeter elevation data"
+  },
+  slope: {
+    name: "Slope",
+    file: "./public/data/mola_hrsc_blend_slope_v2.tif",
+    unit: "°",
+    description: "Surface slope measurements"
+  },
+  roughness: {
+    name: "Roughness",
+    file: "./public/data/mola_roughness_0.6km_numeric.tif",
+    unit: "m",
+    description: "Surface roughness at 0.6km scale"
+  },
+  albedo: {
+    name: "Albedo",
+    file: "./public/data/omega_albedo_r1080.tif",
+    unit: "",
+    description: "Surface albedo (reflectivity)"
+  },
+  temperature: {
+    name: "Temperature",
+    file: "./public/data/mars_yearly_avg_temperature_celsius.tif",
+    unit: "°C",
+    description: "Yearly average surface temperature"
+  },
+  tempRange: {
+    name: "Temperature Range",
+    file: "./public/data/mars_yearly_temperature_range_v1.0.tif",
+    unit: "°C",
+    description: "Yearly temperature variation"
+  },
+  crustalThickness: {
+    name: "Crustal Thickness",
+    file: "./public/data/mars_crustal_thickness_gmm3_rm1.tif",
+    unit: "km",
+    description: "Mars crustal thickness"
+  },
+  ferric: {
+    name: "Ferric Content",
+    file: "./public/data/omega_ferric_nnphs.tif",
+    unit: "",
+    description: "Ferric iron content"
+  },
+  pyroxene: {
+    name: "Pyroxene",
+    file: "./public/data/omega_pyroxene_bd2000.tif",
+    unit: "",
+    description: "Pyroxene mineral content"
+  },
+  basalt: {
+    name: "Basalt",
+    file: "./public/data/TES_Basalt_numeric.tif",
+    unit: "",
+    description: "Basalt abundance"
+  },
+  lambertAlbedo: {
+    name: "Lambert Albedo",
+    file: "./public/data/TES_Lambert_Albedo_numeric.tif",
+    unit: "",
+    description: "Lambert albedo from TES"
+  }
+};
+
+let currentDataset = null;
+let currentDatasetType = 'elevation';
+let loadedDatasets = new Map();
+let currentMarsData = null; // Store current Mars data for API calls
+
+async function loadGeoTIFF(url) {
+  try {
+    console.log("Loading GeoTIFF from:", url);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    console.log("ArrayBuffer loaded, size:", arrayBuffer.byteLength);
+    
+    const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+    const image = await tiff.getImage();
+    const data = await image.readRasters({ interleave: true });
+    
+    console.log("GeoTIFF loaded successfully:", image.getWidth(), "x", image.getHeight());
+    
+    // Handle cases where getBoundingBox() might fail due to missing affine transformation
+    let bounds;
+    try {
+      bounds = image.getBoundingBox();
+    } catch (boundsError) {
+      console.warn("Could not get bounding box, using default Mars bounds:", boundsError.message);
+      // Default bounds for Mars (assuming equirectangular projection)
+      bounds = [-180, -90, 180, 90];
+    }
+    
+    return { 
+      width: image.getWidth(), 
+      height: image.getHeight(), 
+      data, 
+      bounds 
+    };
+  } catch (error) {
+    console.error("Error loading GeoTIFF:", error);
+    // Fallback to mock data
+    console.log("Falling back to mock data");
+    return {
+      width: 1024,
+      height: 512,
+      data: new Array(1024 * 512).fill(0).map(() => Math.random() * 1000 - 500),
+      bounds: [-180, -90, 180, 90]
+    };
+  }
+}
+
+// Load a specific dataset
+async function loadDataset(datasetType) {
+  const dataset = marsDatasets[datasetType];
+  if (!dataset) {
+    console.error("Unknown dataset type:", datasetType);
+    return null;
+  }
+
+  // Check if already loaded
+  if (loadedDatasets.has(datasetType)) {
+    console.log("Dataset already loaded:", dataset.name);
+    return loadedDatasets.get(datasetType);
+  }
+
+  console.log("Loading dataset:", dataset.name);
+  const data = await loadGeoTIFF(dataset.file);
+  loadedDatasets.set(datasetType, data);
+  return data;
+}
+
+// Switch to a different dataset
+async function switchDataset(datasetType) {
+  currentDatasetType = datasetType;
+  currentDataset = await loadDataset(datasetType);
+  
+  // Update UI
+  const dataset = marsDatasets[datasetType];
+  document.getElementById("datasetInfo").innerText = `Current: ${dataset.name}`;
+  document.getElementById("datasetDescription").innerText = dataset.description;
+  
+  console.log("Switched to dataset:", dataset.name);
+}
+
+// Load initial dataset at startup
+(async () => {
+  try {
+    currentDataset = await loadDataset('elevation');
+    console.log("Loaded initial Mars dataset:", currentDataset.width, "x", currentDataset.height);
+  } catch (error) {
+    console.error("Failed to load Mars dataset:", error);
+    // Show user-friendly error message
+    document.getElementById("coords").innerText = "Error loading elevation data";
+  }
+})();
+
+// Convert latitude/longitude to pixel coordinates
+function latLonToPixel(lat, lon, width, height) {
+  const x = Math.floor(((lon + 180) / 360) * width);
+  const y = Math.floor(((90 - lat) / 180) * height);
+  return { x, y };
+}
+
+function getValueAt(lat, lon) {
+  if (!currentDataset) return null;
+  const { width, height, data } = currentDataset;
+  const { x, y } = latLonToPixel(lat, lon, width, height);
+  
+  // Check bounds to prevent array index errors
+  if (x < 0 || x >= width || y < 0 || y >= height) {
+    return null;
+  }
+  
+  const index = y * width + x;
+  if (index >= data.length) {
+    return null;
+  }
+  
+  return data[index];
+}
+
+// Get value from a specific dataset at given coordinates
+function getValueFromDataset(datasetType, lat, lon) {
+  const dataset = loadedDatasets.get(datasetType);
+  if (!dataset) return null;
+  
+  const { width, height, data } = dataset;
+  const { x, y } = latLonToPixel(lat, lon, width, height);
+  
+  // Check bounds to prevent array index errors
+  if (x < 0 || x >= width || y < 0 || y >= height) {
+    return null;
+  }
+  
+  const index = y * width + x;
+  if (index >= data.length) {
+    return null;
+  }
+  
+  return data[index];
+}
+
+// --- Mouse Click Handler ---
+async function onMouseClick(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObject(sphere);
+  const intersects = raycaster.intersectObject(marsSphere);
 
   if (intersects.length > 0) {
     const point = intersects[0].point;
-    const radius = sphere.geometry.parameters.radius;
-    const x = point.x;
-    const y = point.y;
-    const z = point.z;
+    const radius = marsSphere.geometry.parameters.radius;
+    const lon = Math.atan2(point.z, point.x) * (180 / Math.PI);
+    const lat = Math.asin(point.y / radius) * (180 / Math.PI);
 
-    const lon = Math.atan2(z, x) * (180 / Math.PI);
-    const lat = Math.asin(y / radius) * (180 / Math.PI);
+    // Show loading message
+    document.getElementById("coords").innerText = `Loading all datasets for Lat: ${lat.toFixed(2)}°, Lon: ${lon.toFixed(2)}°...`;
 
-    // Update overlay
-    const coordsDiv = document.getElementById("coords");
-    coordsDiv.innerText = `Lat: ${lat.toFixed(2)}°, Lon: ${lon.toFixed(2)}°`;
+    // Load all datasets and get values
+    const allValues = [];
+    for (const [datasetType, datasetInfo] of Object.entries(marsDatasets)) {
+      try {
+        // Load dataset if not already loaded
+        if (!loadedDatasets.has(datasetType)) {
+          await loadDataset(datasetType);
+        }
+        
+        const value = getValueFromDataset(datasetType, lat, lon);
+        allValues.push({
+          name: datasetInfo.name,
+          value: value,
+          unit: datasetInfo.unit,
+          description: datasetInfo.description
+        });
+      } catch (error) {
+        console.warn(`Failed to load ${datasetInfo.name}:`, error);
+        allValues.push({
+          name: datasetInfo.name,
+          value: null,
+          unit: datasetInfo.unit,
+          description: datasetInfo.description
+        });
+      }
+    }
 
-    // Move marker to clicked point
+    // Format all values into a list and store data for API
+    let valuesList = `Lat: ${lat.toFixed(2)}°, Lon: ${lon.toFixed(2)}°\n\n`;
+    currentMarsData = {
+      lat: lat,
+      lon: lon,
+      elevation: null,
+      slope: null,
+      roughness: null,
+      albedo: null,
+      temperature: null,
+      tempRange: null,
+      crustalThickness: null,
+      ferric: null,
+      pyroxene: null,
+      basalt: null,
+      lambertAlbedo: null
+    };
+    
+    allValues.forEach(item => {
+      const valueStr = item.value !== null ? `${item.value.toFixed(2)} ${item.unit}` : "N/A";
+      valuesList += `• ${item.name}: ${valueStr}\n`;
+      
+      // Store data for API call
+      const key = item.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (key.includes('elevation')) currentMarsData.elevation = item.value;
+      else if (key.includes('slope')) currentMarsData.slope = item.value;
+      else if (key.includes('roughness')) currentMarsData.roughness = item.value;
+      else if (key.includes('albedo') && !key.includes('lambert')) currentMarsData.albedo = item.value;
+      else if (key.includes('temperature') && !key.includes('range')) currentMarsData.temperature = item.value;
+      else if (key.includes('temperaturerange')) currentMarsData.tempRange = item.value;
+      else if (key.includes('crustalthickness')) currentMarsData.crustalThickness = item.value;
+      else if (key.includes('ferric')) currentMarsData.ferric = item.value;
+      else if (key.includes('pyroxene')) currentMarsData.pyroxene = item.value;
+      else if (key.includes('basalt')) currentMarsData.basalt = item.value;
+      else if (key.includes('lambertalbedo')) currentMarsData.lambertAlbedo = item.value;
+    });
+
+    // Update UI
+    document.getElementById("coords").innerText = valuesList;
+    
+    // Show prediction button
+    document.getElementById("predictLanding").style.display = "block";
+    document.getElementById("landingScore").innerText = "";
+
+    // Show marker
     marker.position.copy(point);
     marker.visible = true;
   }
 }
+
 window.addEventListener("click", onMouseClick, false);
+
