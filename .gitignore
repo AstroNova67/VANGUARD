@@ -8,6 +8,7 @@ __pycache__/
 .venv/
 env/
 venv/
+venv-api/
 
 # Jupyter
 .ipynb_checkpoints
@@ -20,3 +21,6 @@ venv/
 
 # Pycharm Project settings
 .idea/
+
+node_modules/
+

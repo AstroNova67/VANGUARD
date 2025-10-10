@@ -1,6 +1,53 @@
 import numpy as np
+import pickle
+import os
+from sklearn.preprocessing import RobustScaler, QuantileTransformer
 import tensorflow as tf
 
+
+# Global variable to store loaded scalers
+scalers = {}
+
+# Resolve paths relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def load_scalers():
+    """Load all saved scalers and transformers"""
+    global scalers
+    scaler_dir = os.path.join(BASE_DIR, 'saved_models', 'scalers')
+    
+    try:
+        # Load slope scaler
+        with open(f'{scaler_dir}/slope_scaler.pkl', 'rb') as f:
+            scalers['slope'] = pickle.load(f)
+        
+        # Load dust scalers
+        with open(f'{scaler_dir}/dust_feature_scaler.pkl', 'rb') as f:
+            scalers['dust_feature'] = pickle.load(f)
+        with open(f'{scaler_dir}/dust_target_transformer.pkl', 'rb') as f:
+            scalers['dust_target'] = pickle.load(f)
+        
+        # Load surface temperature scaler
+        with open(f'{scaler_dir}/surface_temp_scaler.pkl', 'rb') as f:
+            scalers['surface_temp'] = pickle.load(f)
+        with open(f'{scaler_dir}/surface_temp_y_min.pkl', 'rb') as f:
+            scalers['surface_temp_y_min'] = pickle.load(f)
+        
+        # Load thermal inertia transformers
+        with open(f'{scaler_dir}/thermal_inertia_feature_transformer.pkl', 'rb') as f:
+            scalers['thermal_inertia_feature'] = pickle.load(f)
+        with open(f'{scaler_dir}/thermal_inertia_target_transformer.pkl', 'rb') as f:
+            scalers['thermal_inertia_target'] = pickle.load(f)
+        
+        # Load water scaler
+        with open(f'{scaler_dir}/water_scaler.pkl', 'rb') as f:
+            scalers['water'] = pickle.load(f)
+        
+        print(f"✅ Loaded {len(scalers)} scalers and transformers")
+        
+    except Exception as e:
+        print(f"❌ Error loading scalers: {e}")
+        scalers = {}
 
 class LandingSuitabilityScorer:
     def __init__(self, weights=None):
@@ -21,11 +68,12 @@ class LandingSuitabilityScorer:
         return score
 
     def score_site(self, slope, dust, surface_temp, thermal_inertia, water):
-        slope_score = self.normalize(slope, 0, 30, invert=True)
-        dust_score = self.normalize(dust, 0, 1, invert=True)
-        temp_score = self.normalize(surface_temp, -100, 20, invert=False)
-        inertia_score = self.normalize(thermal_inertia, 100, 1200, invert=False)
-        water_score = self.normalize(water, 0, 1, invert=False)
+        # Use ranges based on actual ML model prediction ranges for better discrimination
+        slope_score = self.normalize(slope, 0, 5, invert=True)  # ML gives 0.7-4.8°, so use 0-5°
+        dust_score = self.normalize(dust, 0.6, 0.7, invert=True)  # ML gives 0.64-0.70, so use 0.6-0.7
+        temp_score = self.normalize(surface_temp, -90, -40, invert=False)  # ML gives -40 to -90°C, so use -90 to -40°C
+        inertia_score = self.normalize(thermal_inertia, 100, 400, invert=False)  # ML gives 100-400, so use 100-400
+        water_score = self.normalize(water, 1, 8, invert=False)  # ML gives 1-8%, so use 1-8%
 
         final_score = (
                 slope_score * self.weights["slope"] +
@@ -39,27 +87,127 @@ class LandingSuitabilityScorer:
 
 
 # Example: Using Neural Network predictions
-# Assume nn_model_* are your trained Keras/PyTorch models
-def predict_properties_nn(features):
-    """
-    features: list or array of input features for the NN models
-    nn_models: dict with keys 'slope', 'dust', 'temp', 'TI', 'water'
-               and values = trained neural networks
-    returns: predicted property values
-    """
-    slope_pred = \
-    tf.keras.models.load_model('saved_models/neural_nets/slope_pred/best_model.keras').predict(np.array([features]))[0][
-        0]
-    dust_pred = tf.keras.models.load_model('saved_models/neural_nets/dust_predictor/best_model.keras').predict(
-        np.array([features]))[0][0]
-    temp_pred = tf.keras.models.load_model('saved_models/neural_nets/surface_temp_pred/best_model.keras').predict(
-        np.array([features]))[0][0]
-    TI_pred = tf.keras.models.load_model('saved_models/neural_nets/thermal_inertia_predictor/best_model.keras').predict(
-        np.array([features]))[0][0]
-    water_pred = tf.keras.models.load_model('saved_models/neural_nets/water_predictor/best_model.keras').predict(
-        np.array([features]))[0][0]
+def map_mars_data_to_features(mars_data, model_name):
+    """Map Mars data to model-specific features with proper scaling using saved scalers"""
+    # Load scalers if not already loaded
+    if not scalers:
+        load_scalers()
+    
+    # Extract raw data
+    albedo = mars_data.get('albedo', 0.2)
+    temperature = mars_data.get('temperature', -30.0)
+    roughness = mars_data.get('roughness', 50.0)
+    ferric = mars_data.get('ferric', 0.5)
+    elevation = mars_data.get('elevation', 1000.0)
+    temp_range = mars_data.get('tempRange', 50.0)
+    slope = mars_data.get('slope', 2.0)
+    
+    if model_name == 'slope':
+        features = [albedo, temperature, roughness, ferric, elevation, temp_range, abs(slope), abs(slope * 0.1)]
+        if 'slope' in scalers:
+            normalized_features = scalers['slope'].transform([features])
+        else:
+            # Fallback to manual scaling if scaler not available
+            normalized_features = [[features[0], features[1] / 100.0, features[2] / 1000.0, features[3], features[4] / 10000.0, features[5] / 200.0, features[6] / 10.0, features[7] / 10.0]]
+    elif model_name == 'dust':
+        features = [elevation, slope, temperature, temperature, slope, albedo]
+        if 'dust_feature' in scalers:
+            normalized_features = scalers['dust_feature'].transform([features])
+        else:
+            # Fallback to manual scaling if scaler not available
+            normalized_features = [[features[0] / 10000.0, features[1] / 10.0, features[2] / 100.0, features[3] / 100.0, features[4] / 10.0, features[5]]]
+    elif model_name == 'surface_temp':
+        # Surface temp model: 5 features - ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km']
+        features = [elevation, albedo, temperature, slope, roughness]
+        if 'surface_temp' in scalers:
+            normalized_features = scalers['surface_temp'].transform([features])
+        else:
+            # Fallback to manual scaling if scaler not available
+            normalized_features = [[features[0] / 10000.0, features[1], features[2] / 100.0, features[3] / 10.0, features[4] / 1000.0]]
+    elif model_name == 'thermal_inertia':
+        # Thermal inertia model: 4 features - ['Yearly Mars Surface Temperature Variation (C)', 'Albedo', 'Slope', 'OMEGA Ferric/Dust 860nm ratio']
+        features = [temp_range, albedo, slope, ferric]
+        if 'thermal_inertia_feature' in scalers:
+            normalized_features = scalers['thermal_inertia_feature'].transform([features])
+        else:
+            # Fallback to manual scaling if scaler not available
+            normalized_features = [[features[0] / 200.0, features[1], features[2] / 10.0, features[3]]]
+    elif model_name == 'water':
+        features = [albedo, temperature, roughness, ferric, elevation, temp_range, abs(slope), abs(slope * 0.1)]
+        if 'water' in scalers:
+            normalized_features = scalers['water'].transform([features])
+        else:
+            # Fallback to manual scaling if scaler not available
+            normalized_features = [[features[0], features[1] / 100.0, features[2] / 1000.0, features[3], features[4] / 10000.0, features[5] / 200.0, features[6] / 10.0, features[7] / 10.0]]
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
+    
+    return np.array(normalized_features)
 
-    return slope_pred, dust_pred, temp_pred, TI_pred, water_pred
+def inverse_transform_predictions(slope_pred, dust_pred, temp_pred, TI_pred, water_pred):
+    """
+    Convert raw ML predictions back to realistic Mars values using exact inverse transformations
+    """
+    # Slope: log1p transform -> expm1 inverse
+    slope_real = max(0, np.expm1(slope_pred))
+    
+    # Dust: QuantileTransformer inverse
+    if 'dust_target' in scalers:
+        dust_real = scalers['dust_target'].inverse_transform([[dust_pred]])[0][0]
+    else:
+        # Fallback approximation
+        dust_real = max(0, min(1, 0.5 + dust_pred * 0.2))
+    
+    # Surface Temperature: log1p + shift inverse
+    if 'surface_temp_y_min' in scalers:
+        y_min = scalers['surface_temp_y_min']
+        temp_real = np.expm1(temp_pred) + y_min - 1
+    else:
+        # Fallback approximation
+        temp_real = np.expm1(temp_pred) - 100 - 1
+    
+    # Thermal Inertia: QuantileTransformer inverse
+    if 'thermal_inertia_target' in scalers:
+        TI_real = scalers['thermal_inertia_target'].inverse_transform([[TI_pred]])[0][0]
+    else:
+        # Fallback approximation
+        TI_real = max(100, min(1200, 400 + TI_pred * 200))
+    
+    # Water: log1p transform -> expm1 inverse
+    water_real = max(0, np.expm1(water_pred))
+    
+    return slope_real, dust_real, temp_real, TI_real, water_real
+
+def predict_properties_nn(mars_data):
+    """
+    mars_data: dict with Mars surface data
+    returns: predicted property values using model-specific features with proper inverse transforms
+    """
+    # Load scalers if not already loaded
+    if not scalers:
+        load_scalers()
+    try:
+        # Get raw model predictions
+        slope_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'slope_pred', 'best_model.keras')).predict(
+            map_mars_data_to_features(mars_data, 'slope'))[0][0]
+        dust_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'dust_predictor', 'best_model.keras')).predict(
+            map_mars_data_to_features(mars_data, 'dust'))[0][0]
+        temp_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'surface_temp_pred', 'best_model.keras')).predict(
+            map_mars_data_to_features(mars_data, 'surface_temp'))[0][0]
+        TI_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'thermal_inertia_predictor', 'best_model.keras')).predict(
+            map_mars_data_to_features(mars_data, 'thermal_inertia'))[0][0]
+        water_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'water_predictor', 'best_model.keras')).predict(
+            map_mars_data_to_features(mars_data, 'water'))[0][0]
+        
+        # Apply inverse transformations
+        slope_pred, dust_pred, temp_pred, TI_pred, water_pred = inverse_transform_predictions(
+            slope_pred_raw, dust_pred_raw, temp_pred_raw, TI_pred_raw, water_pred_raw
+        )
+        
+        return slope_pred, dust_pred, temp_pred, TI_pred, water_pred
+    except Exception as e:
+        print(f"Error in predict_properties_nn: {e}")
+        return 0.0, 0.0, 0.0, 0.0, 0.0
 
 
 # Example usage (commented out to prevent execution on import)
@@ -73,3 +221,4 @@ def predict_properties_nn(features):
 # scorer = LandingSuitabilityScorer()
 # landing_score = scorer.score_site(pred_slope, pred_dust, pred_temp, pred_TI, pred_water)
 # print(f"Predicted Landing Score (NN-based): {landing_score}%")
+

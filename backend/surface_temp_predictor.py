@@ -12,7 +12,6 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.preprocessing import RobustScaler
-from tensorflow.keras.callbacks import EarlyStopping
 from xgboost import XGBRegressor
 
 SEED = 42
