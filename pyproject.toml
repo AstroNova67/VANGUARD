@@ -68,6 +68,8 @@ dependencies = [
     "Flask==2.3.3",
     "Flask-CORS==4.0.0",
     "pickle-mixin==1.0.2",
+    "dotenv>=0.9.9",
+    "openai-agents>=0.4.1",
 ]
 
 [dependency-groups]

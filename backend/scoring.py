@@ -50,6 +50,28 @@ def load_scalers():
         scalers = {}
 
 class LandingSuitabilityScorer:
+    """
+    Expert system for scoring Mars landing site suitability.
+    
+    Scoring criteria and weights are based on NASA/JPL engineering constraints and
+    scientific objectives from official Mars mission landing site selection processes.
+    
+    Primary Sources:
+    - Golombek et al. (2012). "Selection of the Mars Science Laboratory landing site."
+    - Golombek et al. (2003). "Selection of the Mars Exploration Rover landing sites."
+    - NASA/JPL-Caltech (2018). "Mars in a Minute: How Do You Choose a Landing Site?"
+    - NASA. "Mars Landing Site Selection: A Crew Perspective."
+    
+    Weight Distribution:
+    - Slope (30%): Critical for rover stability at touchdown (<30° constraint)
+    - Dust (20%): Avoid dust-dominated surfaces for safe landing and roving
+    - Surface Temperature (20%): Thermal management constraint (±30° latitude)
+    - Thermal Inertia (20%): Indicates surface stability and load-bearing capacity
+    - Water (10%): Scientific interest (secondary to engineering safety)
+    
+    For detailed source citations, excerpts, and justification, see:
+    backend/LANDING_SCORING_SOURCES.md
+    """
     def __init__(self, weights=None):
         default_weights = {
             "slope": 0.3,
@@ -68,11 +90,30 @@ class LandingSuitabilityScorer:
         return score
 
     def score_site(self, slope, dust, surface_temp, thermal_inertia, water):
-        # Use ranges based on actual ML model prediction ranges for better discrimination
+        """
+        Score a landing site based on predicted surface properties.
+        
+        Scoring ranges based on ML model predictions and NASA engineering constraints.
+        See LANDING_SCORING_SOURCES.md for detailed source citations.
+        """
+        # Slope: <30° constraint for rover stability (Golombek et al., 2012)
+        # Range 0-5° selected for discrimination within safe zone
         slope_score = self.normalize(slope, 0, 5, invert=True)  # ML gives 0.7-4.8°, so use 0-5°
+        
+        # Dust: Avoid dust-dominated surfaces (multiple NASA sources)
+        # Lower dust = better surface stability and load-bearing capacity
         dust_score = self.normalize(dust, 0.6, 0.7, invert=True)  # ML gives 0.64-0.70, so use 0.6-0.7
+        
+        # Temperature: Thermal management constraint (±30° latitude)
+        # Warmer temperatures better for instrument operation and power efficiency
         temp_score = self.normalize(surface_temp, -90, -40, invert=False)  # ML gives -40 to -90°C, so use -90 to -40°C
+        
+        # Thermal Inertia: Higher = more stable, rocky surface with better load-bearing
+        # Indicates surface trafficability and stability
         inertia_score = self.normalize(thermal_inertia, 100, 400, invert=False)  # ML gives 100-400, so use 100-400
+        
+        # Water: Scientific interest (secondary to engineering safety)
+        # Higher water content indicates scientific value but not safety-critical
         water_score = self.normalize(water, 1, 8, invert=False)  # ML gives 1-8%, so use 1-8%
 
         final_score = (

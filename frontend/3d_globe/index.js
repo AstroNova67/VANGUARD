@@ -251,15 +251,13 @@ async function loadGeoTIFF(url) {
     const image = await tiff.getImage();
     const data = await image.readRasters({ interleave: true });
     
-    console.log("GeoTIFF loaded successfully:", image.getWidth(), "x", image.getHeight());
     
     // Handle cases where getBoundingBox() might fail due to missing affine transformation
     let bounds;
     try {
       bounds = image.getBoundingBox();
     } catch (boundsError) {
-      console.warn("Could not get bounding box, using default Mars bounds:", boundsError.message);
-      // Default bounds for Mars (assuming equirectangular projection)
+      // Silently use default bounds for Mars (assuming equirectangular projection)
       bounds = [-180, -90, 180, 90];
     }
     
@@ -292,11 +290,9 @@ async function loadDataset(datasetType) {
 
   // Check if already loaded
   if (loadedDatasets.has(datasetType)) {
-    console.log("Dataset already loaded:", dataset.name);
     return loadedDatasets.get(datasetType);
   }
 
-  console.log("Loading dataset:", dataset.name);
   const data = await loadGeoTIFF(dataset.file);
   loadedDatasets.set(datasetType, data);
   return data;
@@ -311,8 +307,6 @@ async function switchDataset(datasetType) {
   const dataset = marsDatasets[datasetType];
   document.getElementById("datasetInfo").innerText = `Current: ${dataset.name}`;
   document.getElementById("datasetDescription").innerText = dataset.description;
-  
-  console.log("Switched to dataset:", dataset.name);
 }
 
 // Load initial dataset at startup
