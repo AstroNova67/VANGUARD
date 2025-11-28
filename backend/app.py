@@ -419,8 +419,14 @@ def get_model_info():
     })
 
 if __name__ == '__main__':
-    print("🚀 Starting Mars Landing Suitability API...")
+    print("🚀 Starting Mars Landing Suitability Website...")
     load_scalers()
     load_models()
-    print("🌍 API ready! Access at http://localhost:5002")
-    app.run(debug=True, host='0.0.0.0', port=5002)
+    
+    # Use PORT environment variable (Render provides this) or default to 5002
+    port = int(os.environ.get('PORT', 5002))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    
+    print(f"🌍 Website ready! Access at http://0.0.0.0:{port}")
+    print("📡 API endpoints available at /predict")
+    app.run(debug=debug, host='0.0.0.0', port=port)

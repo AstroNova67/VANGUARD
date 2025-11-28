@@ -70,6 +70,7 @@ dependencies = [
     "pickle-mixin==1.0.2",
     "dotenv>=0.9.9",
     "openai-agents>=0.4.1",
+    "gunicorn>=23.0.0",
 ]
 
 [dependency-groups]
