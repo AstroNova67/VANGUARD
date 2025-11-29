@@ -6,7 +6,7 @@ import keras
 import pickle
 import json
 import os
-from scoring import LandingSuitabilityScorer, predict_properties_nn
+from backend.scoring import LandingSuitabilityScorer, predict_properties_nn
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
