@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import numpy as np
 import tensorflow as tf
@@ -18,6 +18,8 @@ scalers = {}  # Store loaded scalers
 
 # Resolve paths relative to this file so the API can run from any CWD
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend', '3d_globe')
 
 def _clamp_predictions(preds: dict) -> dict:
     """Clamp predictions to plausible physical ranges for stability."""
@@ -417,6 +419,48 @@ def get_model_info():
         'neural_models': list(neural_models.keys()),
         'regression_models': list(regression_models.keys())
     })
+
+# Frontend serving routes
+@app.route('/')
+def index():
+    """Serve the main frontend HTML page"""
+    return send_file(os.path.join(FRONTEND_DIR, 'index.html'))
+
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve frontend static files (JS, CSS, textures, data, etc.)"""
+    # Don't serve API routes through this handler
+    if path.startswith('predict') or path.startswith('health') or path.startswith('models'):
+        return jsonify({'error': 'Not found'}), 404
+    
+    # Security: prevent path traversal
+    if '..' in path:
+        return jsonify({'error': 'Invalid path'}), 400
+    
+    # Build file path
+    file_path = os.path.join(FRONTEND_DIR, path)
+    
+    # Security check: ensure file is within frontend directory
+    try:
+        file_path_abs = os.path.abspath(file_path)
+        frontend_dir_abs = os.path.abspath(FRONTEND_DIR)
+        if not file_path_abs.startswith(frontend_dir_abs):
+            return jsonify({'error': 'Access denied'}), 403
+    except:
+        return jsonify({'error': 'Invalid path'}), 400
+    
+    # If it's a file, serve it
+    if os.path.isfile(file_path):
+        return send_file(file_path)
+    
+    # If it's a directory, try to serve index.html from it (for SPA routing)
+    if os.path.isdir(file_path):
+        index_path = os.path.join(file_path, 'index.html')
+        if os.path.exists(index_path):
+            return send_file(index_path)
+    
+    # File not found
+    return jsonify({'error': 'File not found'}), 404
 
 if __name__ == '__main__':
     print("🚀 Starting Mars Landing Suitability Website...")
