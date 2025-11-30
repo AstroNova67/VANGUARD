@@ -78,7 +78,9 @@ async function predictLandingSuitability() {
     document.getElementById("landingScore").innerText = "🔄 Predicting landing suitability...";
     document.getElementById("predictLanding").disabled = true;
     
-    const response = await fetch('http://localhost:5002/predict', {
+    // Use relative URL so it works on both localhost and Render
+    const apiUrl = window.location.origin + '/predict';
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
