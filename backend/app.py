@@ -301,25 +301,88 @@ def map_mars_data_to_features(mars_data, model_name):
     return np.array(features).reshape(1, -1)
 
 def predict_with_neural_networks(mars_data):
-    """Use neural networks to predict properties (inverse-transformed to real units)"""
+    """Use neural networks to predict properties (inverse-transformed to real units)
+    Optimized to use pre-loaded models instead of loading from disk each time.
+    """
     try:
-        slope, dust, surface_temp, thermal_inertia, water = predict_properties_nn(mars_data)
-        return {
-            'slope': float(slope),
-            'dust': float(dust),
-            'surface_temp': float(surface_temp),
-            'thermal_inertia': float(thermal_inertia),
-            'water': float(water)
-        }
+        # Use pre-loaded models if available (much faster - avoids disk I/O on every prediction)
+        if len(neural_models) == 5 and len(scalers) >= 8:
+            # Optimized path: use pre-loaded models and scalers
+            # Import scoring functions (using same import pattern as top of file)
+            try:
+                from backend.scoring import map_mars_data_to_features, inverse_transform_predictions
+                import backend.scoring as scoring_module
+            except ImportError:
+                from scoring import map_mars_data_to_features, inverse_transform_predictions
+                import scoring as scoring_module
+            
+            # Temporarily share scalers with scoring module for inverse_transform
+            original_scalers = getattr(scoring_module, 'scalers', {})
+            scoring_module.scalers = scalers
+            
+            try:
+                # Get predictions using pre-loaded models (much faster than disk I/O)
+                slope_features = map_mars_data_to_features(mars_data, 'slope')
+                dust_features = map_mars_data_to_features(mars_data, 'dust')
+                temp_features = map_mars_data_to_features(mars_data, 'surface_temp')
+                ti_features = map_mars_data_to_features(mars_data, 'thermal_inertia')
+                water_features = map_mars_data_to_features(mars_data, 'water')
+                
+                # Predict with pre-loaded models (verbose=0 suppresses TensorFlow output)
+                slope_pred_raw = neural_models['slope'].predict(slope_features, verbose=0)[0][0]
+                dust_pred_raw = neural_models['dust'].predict(dust_features, verbose=0)[0][0]
+                temp_pred_raw = neural_models['surface_temp'].predict(temp_features, verbose=0)[0][0]
+                ti_pred_raw = neural_models['thermal_inertia'].predict(ti_features, verbose=0)[0][0]
+                water_pred_raw = neural_models['water'].predict(water_features, verbose=0)[0][0]
+                
+                # Apply inverse transformations
+                slope, dust, surface_temp, thermal_inertia, water = inverse_transform_predictions(
+                    slope_pred_raw, dust_pred_raw, temp_pred_raw, ti_pred_raw, water_pred_raw
+                )
+                
+                result = {
+                    'slope': float(slope),
+                    'dust': float(dust),
+                    'surface_temp': float(surface_temp),
+                    'thermal_inertia': float(thermal_inertia),
+                    'water': float(water)
+                }
+            finally:
+                # Restore original scalers in scoring module
+                scoring_module.scalers = original_scalers
+            
+            return result
+        else:
+            # Fallback: use original function (loads models from disk)
+            slope, dust, surface_temp, thermal_inertia, water = predict_properties_nn(mars_data)
+            return {
+                'slope': float(slope),
+                'dust': float(dust),
+                'surface_temp': float(surface_temp),
+                'thermal_inertia': float(thermal_inertia),
+                'water': float(water)
+            }
     except Exception as e:
-        print(f"Error in predict_with_neural_networks: {e}")
-        return {
-            'slope': 0.0,
-            'dust': 0.0,
-            'surface_temp': 0.0,
-            'thermal_inertia': 0.0,
-            'water': 0.0
-        }
+        print(f"Error in predict_with_neural_networks (optimized path): {e}")
+        # Fallback to original method if optimization fails
+        try:
+            slope, dust, surface_temp, thermal_inertia, water = predict_properties_nn(mars_data)
+            return {
+                'slope': float(slope),
+                'dust': float(dust),
+                'surface_temp': float(surface_temp),
+                'thermal_inertia': float(thermal_inertia),
+                'water': float(water)
+            }
+        except Exception as e2:
+            print(f"Error in predict_with_neural_networks (fallback): {e2}")
+            return {
+                'slope': 0.0,
+                'dust': 0.0,
+                'surface_temp': 0.0,
+                'thermal_inertia': 0.0,
+                'water': 0.0
+            }
 
 def predict_with_regression_models(mars_data):
     """Use regression models to predict properties"""
@@ -414,10 +477,22 @@ def predict_landing_suitability():
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
+    # Check if model files exist
+    model_files_exist = {}
+    for model_name in ['slope', 'dust', 'surface_temp', 'thermal_inertia', 'water']:
+        model_path = os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 
+                                 f"{model_name}_pred" if model_name == 'slope' else 
+                                 f"{model_name}_predictor" if model_name in ['dust', 'thermal_inertia', 'water'] else
+                                 f"{model_name}_pred", 'best_model.keras')
+        model_files_exist[model_name] = os.path.exists(model_path)
+    
     return jsonify({
         'status': 'healthy',
         'neural_models_loaded': len(neural_models),
-        'regression_models_loaded': len(regression_models)
+        'regression_models_loaded': len(regression_models),
+        'model_files_exist': model_files_exist,
+        'scalers_loaded': len(scalers),
+        'base_dir': BASE_DIR
     })
 
 @app.route('/models', methods=['GET'])
