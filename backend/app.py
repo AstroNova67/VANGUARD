@@ -23,6 +23,7 @@ CORS(app)  # Enable CORS for frontend communication
 neural_models = {}
 regression_models = {}
 scalers = {}  # Store loaded scalers
+models_loaded = False  # Flag to track if models are loaded (for lazy loading)
 
 # Resolve paths relative to this file so the API can run from any CWD
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -377,6 +378,9 @@ def predict_with_regression_models(mars_data):
 def predict_landing_suitability():
     """Main API endpoint for landing suitability prediction"""
     try:
+        # Ensure models are loaded (lazy loading)
+        ensure_models_loaded()
+        
         # Get Mars data from frontend
         mars_data = request.json
         print(f"Received Mars data: {mars_data}")
@@ -432,10 +436,16 @@ def predict_landing_suitability():
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
+    # Try to load models if not loaded (for health check)
+    try:
+        ensure_models_loaded()
+    except:
+        pass  # Don't fail health check if models aren't loaded yet
     return jsonify({
         'status': 'healthy',
         'neural_models_loaded': len(neural_models),
-        'regression_models_loaded': len(regression_models)
+        'regression_models_loaded': len(regression_models),
+        'models_loaded': models_loaded
     })
 
 @app.route('/models', methods=['GET'])
@@ -488,12 +498,21 @@ def serve_frontend(path):
     # File not found
     return jsonify({'error': 'File not found'}), 404
 
-# Load models and scalers when module is imported (works with both Flask dev server and gunicorn)
-# This ensures models are loaded in production (gunicorn) where __main__ doesn't run
-print("🚀 Loading VANGUARD models and scalers...")
-load_scalers()
-load_models()
-print("✅ All models and scalers loaded!")
+# Lazy loading: Load models on first request to avoid memory issues on Render
+# This prevents worker timeout during startup
+def ensure_models_loaded():
+    """Ensure models and scalers are loaded (lazy loading for Render)"""
+    global models_loaded
+    if not models_loaded:
+        print("🚀 Loading VANGUARD models and scalers (lazy loading)...")
+        try:
+            load_scalers()
+            load_models()
+            models_loaded = True
+            print("✅ All models and scalers loaded!")
+        except Exception as e:
+            print(f"❌ Error loading models: {e}")
+            raise
 
 if __name__ == '__main__':
     print("🚀 Starting Mars Landing Suitability Website...")
