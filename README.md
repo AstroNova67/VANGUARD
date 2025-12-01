@@ -36,16 +36,6 @@ By extracting and analyzing datasets such as **elevation**, **albedo**, **slope*
 
 ## 🚀 Quick Start
 
-### Try the Deployed Version
-
-**🌐 Live Demo**: [https://vanguard-i838.onrender.com](https://vanguard-i838.onrender.com)
-
-You can try the deployed version immediately! Click anywhere on the 3D Mars globe to see surface data and get landing suitability predictions.
-
-> **Note**: The deployed version runs on Render's free tier, which may spin down after inactivity. First requests may take 30-60 seconds to wake up the service. Response times are slower than local development due to shared resources.
-
-### Running Locally
-
 This project uses `uv` for dependency management. If you don't have `uv` installed, install it first:
 
 ```bash
@@ -53,7 +43,7 @@ This project uses `uv` for dependency management. If you don't have `uv` install
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Running the Website Locally
+### Running the API
 
 ```bash
 # Method 1: Using the script
@@ -63,10 +53,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv run python backend/app.py
 ```
 
-The website will be available at `http://localhost:5002`:
-- **Website**: `http://localhost:5002` - Interactive 3D Mars visualization
-- **API Endpoint**: `http://localhost:5002/predict` - Landing suitability predictions
-- **Health Check**: `http://localhost:5002/health` - Server status
+The API will start on `http://localhost:5002` (or port 5000 if 5002 is unavailable).
 
 ### Running Individual Predictors
 
@@ -188,7 +175,7 @@ VANGUARD/
 │   └── app.py                 # Flask API server
 ├── frontend/
 │   ├── 3d_globe/              # Interactive 3D Mars visualization
-
+│   └── website/               # Web interface
 ├── pyproject.toml             # Project configuration and dependencies
 ├── uv.lock                    # Locked dependency versions
 └── start_api.sh              # API startup script
