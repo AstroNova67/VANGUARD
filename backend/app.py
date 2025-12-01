@@ -306,7 +306,10 @@ def predict_with_neural_networks(mars_data):
     """
     try:
         # Use pre-loaded models if available (much faster - avoids disk I/O on every prediction)
+        # Debug: log what we have
+        print(f"🔍 Debug: neural_models count={len(neural_models)}, scalers count={len(scalers)}")
         if len(neural_models) == 5 and len(scalers) >= 8:
+            print("✅ Using optimized path (pre-loaded models)")
             # Optimized path: use pre-loaded models and scalers
             # Import scoring functions (using same import pattern as top of file)
             try:
@@ -545,10 +548,15 @@ def serve_frontend(path):
     # File not found
     return jsonify({'error': 'File not found'}), 404
 
+# Load models and scalers when module is imported (works with both Flask dev server and gunicorn)
+# This ensures models are loaded in production (gunicorn) where __main__ doesn't run
+print("🚀 Loading VANGUARD models and scalers...")
+load_scalers()
+load_models()
+print("✅ All models and scalers loaded!")
+
 if __name__ == '__main__':
     print("🚀 Starting Mars Landing Suitability Website...")
-    load_scalers()
-    load_models()
     
     # Use PORT environment variable (Render provides this) or default to 5002
     port = int(os.environ.get('PORT', 5002))
