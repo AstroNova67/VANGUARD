@@ -378,8 +378,13 @@ def predict_with_regression_models(mars_data):
 def predict_landing_suitability():
     """Main API endpoint for landing suitability prediction"""
     try:
-        # Ensure models are loaded (lazy loading)
-        ensure_models_loaded()
+        # Check if models are loaded
+        if not models_loaded:
+            return jsonify({
+                'success': False,
+                'error': 'Models are still loading. Please try again in a moment.',
+                'landing_score': 0
+            }), 503
         
         # Get Mars data from frontend
         mars_data = request.json
@@ -436,11 +441,6 @@ def predict_landing_suitability():
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    # Try to load models if not loaded (for health check)
-    try:
-        ensure_models_loaded()
-    except:
-        pass  # Don't fail health check if models aren't loaded yet
     return jsonify({
         'status': 'healthy',
         'neural_models_loaded': len(neural_models),
@@ -498,21 +498,18 @@ def serve_frontend(path):
     # File not found
     return jsonify({'error': 'File not found'}), 404
 
-# Lazy loading: Load models on first request to avoid memory issues on Render
-# This prevents worker timeout during startup
-def ensure_models_loaded():
-    """Ensure models and scalers are loaded (lazy loading for Render)"""
-    global models_loaded
-    if not models_loaded:
-        print("🚀 Loading VANGUARD models and scalers (lazy loading)...")
-        try:
-            load_scalers()
-            load_models()
-            models_loaded = True
-            print("✅ All models and scalers loaded!")
-        except Exception as e:
-            print(f"❌ Error loading models: {e}")
-            raise
+# Load models and scalers when module is imported (works with both Flask dev server and gunicorn)
+# This ensures models are loaded in production (gunicorn) where __main__ doesn't run
+# Note: This may take 30-60 seconds on Render free tier, but it ensures models are ready
+print("🚀 Loading VANGUARD models and scalers...")
+try:
+    load_scalers()
+    load_models()
+    models_loaded = True
+    print("✅ All models and scalers loaded!")
+except Exception as e:
+    print(f"❌ Error loading models at startup: {e}")
+    models_loaded = False
 
 if __name__ == '__main__':
     print("🚀 Starting Mars Landing Suitability Website...")
