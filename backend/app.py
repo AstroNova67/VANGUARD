@@ -7,6 +7,7 @@ import pickle
 import json
 import os
 import sys
+import mimetypes
 
 # Optimize TensorFlow memory usage for production
 # Limit GPU memory growth (if GPU available)
@@ -393,8 +394,11 @@ def predict_with_regression_models(mars_data):
 def predict_landing_suitability():
     """Main API endpoint for landing suitability prediction"""
     try:
+        print("📥 Received prediction request")
+        
         # Check if models are loaded
         if not models_loaded:
+            print("⚠️ Models not loaded yet")
             return jsonify({
                 'success': False,
                 'error': 'Models are still loading. Please try again in a moment.',
@@ -536,12 +540,25 @@ def serve_frontend(path):
         frontend_dir_abs = os.path.abspath(FRONTEND_DIR)
         if not file_path_abs.startswith(frontend_dir_abs):
             return jsonify({'error': 'Access denied'}), 403
-    except:
+    except Exception as e:
+        print(f"Error checking file path security: {e}")
         return jsonify({'error': 'Invalid path'}), 400
     
     # If it's a file, serve it
     if os.path.isfile(file_path):
-        return send_file(file_path)
+        # Set correct MIME type for TIF files
+        mimetype = None
+        if file_path.lower().endswith(('.tif', '.tiff')):
+            mimetype = 'image/tiff'
+        elif file_path.lower().endswith('.js'):
+            mimetype = 'application/javascript'
+        elif file_path.lower().endswith('.json'):
+            mimetype = 'application/json'
+        else:
+            mimetype, _ = mimetypes.guess_type(file_path)
+        
+        print(f"Serving file: {path} (mimetype: {mimetype})")
+        return send_file(file_path, mimetype=mimetype)
     
     # If it's a directory, try to serve index.html from it (for SPA routing)
     if os.path.isdir(file_path):
@@ -549,8 +566,9 @@ def serve_frontend(path):
         if os.path.exists(index_path):
             return send_file(index_path)
     
-    # File not found
-    return jsonify({'error': 'File not found'}), 404
+    # File not found - log for debugging
+    print(f"File not found: {path} (resolved to: {file_path})")
+    return jsonify({'error': 'File not found', 'path': path}), 404
 
 # Load models and scalers when module is imported (works with both Flask dev server and gunicorn)
 # This ensures models are loaded in production (gunicorn) where __main__ doesn't run
