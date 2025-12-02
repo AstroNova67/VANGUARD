@@ -386,8 +386,23 @@ def predict_landing_suitability():
                 'landing_score': 0
             }), 503
         
+        # Validate request
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'error': 'Request must be JSON',
+                'landing_score': 0
+            }), 400
+        
         # Get Mars data from frontend
-        mars_data = request.json
+        mars_data = request.get_json()
+        if mars_data is None:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid JSON in request body',
+                'landing_score': 0
+            }), 400
+        
         print(f"Received Mars data: {mars_data}")
         
         # Get predictions from neural networks
@@ -431,12 +446,36 @@ def predict_landing_suitability():
         return jsonify(response)
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         print(f"Error in prediction: {e}")
+        print(f"Traceback: {error_trace}")
         return jsonify({
             'success': False,
             'error': str(e),
             'landing_score': 0
         }), 500
+
+# Global error handler to ensure all errors return JSON
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found', 'message': str(error)}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error', 'message': str(error)}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    error_trace = traceback.format_exc()
+    print(f"Unhandled exception: {e}")
+    print(f"Traceback: {error_trace}")
+    return jsonify({
+        'success': False,
+        'error': str(e),
+        'landing_score': 0
+    }), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():

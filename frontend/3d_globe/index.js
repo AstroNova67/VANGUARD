@@ -88,6 +88,19 @@ async function predictLandingSuitability() {
       body: JSON.stringify(currentMarsData)
     });
     
+    // Check if response is OK
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+    }
+    
+    // Check content type
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
+    }
+    
     const result = await response.json();
     
     if (result.success) {
