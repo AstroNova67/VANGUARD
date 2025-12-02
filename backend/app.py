@@ -8,6 +8,21 @@ import json
 import os
 import sys
 
+# Optimize TensorFlow memory usage for production
+# Limit GPU memory growth (if GPU available)
+try:
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+except:
+    pass
+
+# Set TensorFlow to use less memory
+tf.config.experimental.enable_op_determinism()
+# Disable eager execution optimizations that use extra memory
+tf.config.run_functions_eagerly(False)
+
 # Handle imports for both local development and production (Render)
 # Try absolute import first (for Render), fall back to relative import (for local)
 try:
