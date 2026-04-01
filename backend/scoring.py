@@ -70,7 +70,7 @@ class LandingSuitabilityScorer:
     - Water (10%): Scientific interest (secondary to engineering safety)
     
     For detailed source citations, excerpts, and justification, see:
-    backend/LANDING_SCORING_SOURCES.md
+    LANDING_SCORING_SOURCES.md (repo root)
     """
     def __init__(self, weights=None):
         default_weights = {

@@ -119,17 +119,39 @@ async function predictLandingSuitability() {
         scoreText = 'Good';
       }
       
+      const nn = result.predictions?.neural_networks || {};
+      const reg = result.predictions?.regression_models || {};
+      const overrides = result.overrides_applied || {};
+      const raw = result.raw_mars_data || {};
+      const overrideNote = (key) => (overrides[key] ? ` <span style="opacity:0.8">(overridden by ${overrides[key]})</span>` : '');
+      const rawSummary = Object.keys(raw).length
+        ? Object.entries(raw)
+            .map(([k, v]) => `• ${k}: ${typeof v === 'number' ? v.toFixed(4) : v}`)
+            .join('<br>')
+        : 'N/A';
+
       document.getElementById("landingScore").innerHTML = `
         <div style="color: ${scoreColor}; font-size: 18px;">
           🚀 Landing Suitability: ${score}% (${scoreText})
         </div>
         <div style="font-size: 12px; margin-top: 5px;">
-          Neural Network Predictions:<br>
-          • Slope: ${result.predictions.neural_networks.slope?.toFixed(2) || 'N/A'}<br>
-          • Dust: ${result.predictions.neural_networks.dust?.toFixed(2) || 'N/A'}<br>
-          • Surface Temp: ${result.predictions.neural_networks.surface_temp?.toFixed(2) || 'N/A'}°C<br>
-          • Thermal Inertia: ${result.predictions.neural_networks.thermal_inertia?.toFixed(2) || 'N/A'}<br>
-          • Water: ${result.predictions.neural_networks.water?.toFixed(2) || 'N/A'}
+          Predicted Surface Properties:<br>
+          • Slope: ${nn.slope?.toFixed(2) || 'N/A'}${overrideNote('slope')}<br>
+          • Dust: ${nn.dust?.toFixed(2) || 'N/A'}${overrideNote('dust')}<br>
+          • Surface Temp: ${nn.surface_temp?.toFixed(2) || 'N/A'}°C${overrideNote('surface_temp')}<br>
+          • Thermal Inertia: ${nn.thermal_inertia?.toFixed(2) || 'N/A'}${overrideNote('thermal_inertia')}<br>
+          • Water: ${nn.water?.toFixed(2) || 'N/A'}${overrideNote('water')}
+          <div style="margin-top: 6px; opacity: 0.9;">
+            Regression model outputs (debug):<br>
+            • Surface Temp (XGB): ${reg.surface_temp_xgb?.toFixed(2) || 'N/A'}°C<br>
+            • Thermal Inertia (XGB): ${reg.thermal_inertia_xgb?.toFixed(2) || 'N/A'}
+          </div>
+          <details style="margin-top: 8px;">
+            <summary style="cursor: pointer;">Raw Mars input (what was sent)</summary>
+            <div style="margin-top: 6px; opacity: 0.9;">
+              ${rawSummary}
+            </div>
+          </details>
         </div>
       `;
       

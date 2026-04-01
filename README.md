@@ -1,6 +1,10 @@
 # V.A.N.G.U.A.R.D
 **Visual & Analytical Navigation for Geospatial Understanding And Rover Deployment**
 
+> **Local development demo (current)**: The app is currently intended to be run locally.
+
+<img src="assets/vanguard-demo.png" width="1100" alt="VANGUARD demo screenshot (local development)" />
+
 ## Overview
 
 Our goal is to leverage martian data from JMARS to build machine learning models that predict key surface and environmental attributes of Mars. These models aim to support the identification of ideal landing sites for future missions, based on scientific and engineering criteria.
@@ -54,6 +58,17 @@ uv run python backend/app.py
 ```
 
 The API will start on `http://localhost:5002` (or port 5000 if 5002 is unavailable).
+
+### Running without `uv` (pip)
+
+If you prefer not to use `uv`, you can install Python dependencies via `pip`:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python backend/app.py
+```
 
 ### Running Individual Predictors
 
@@ -239,7 +254,7 @@ The main endpoint combines predictions from all models and calculates a landing 
 - **30-49%**: Poor landing site
 - **0-29%**: Very poor landing site
 
-The scoring system is based on NASA/JPL engineering constraints. See `LANDING_SCORING_SOURCES.md` for detailed source citations.
+The scoring system is implemented in `backend/scoring.py` (`LandingSuitabilityScorer`) and is based on NASA/JPL engineering constraints. See `LANDING_SCORING_SOURCES.md` for detailed source citations.
 
 ### Example Usage
 
@@ -300,7 +315,7 @@ The landing suitability scoring system uses an expert system based on NASA/JPL e
 - **Thermal Inertia (20%)**: Indicates surface stability and load-bearing capacity
 - **Water (10%)**: Scientific interest (secondary to engineering safety)
 
-For detailed source citations and justification, see [LANDING_SCORING_SOURCES.md](LANDING_SCORING_SOURCES.md).
+For detailed source citations and justification, see [LANDING_SCORING_SOURCES.md](LANDING_SCORING_SOURCES.md). The API uses `LandingSuitabilityScorer` in `backend/scoring.py` to compute the `landing_score`.
 
 ## Contributors
 

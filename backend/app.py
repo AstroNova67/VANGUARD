@@ -157,166 +157,6 @@ def load_models():
     
     print(f"📊 Loaded {len(neural_models)} neural network models and {len(regression_models)} regression model types")
 
-def map_mars_data_to_features(mars_data, model_name):
-    """
-    Map Mars dataset values to ML model input features using saved scalers
-    Each model expects different features in different orders
-    """
-    # Extract values from Mars data
-    elevation = mars_data.get('elevation', 0)
-    slope = mars_data.get('slope', 0)
-    roughness = mars_data.get('roughness', 0)
-    albedo = mars_data.get('albedo', 0)
-    temperature = mars_data.get('temperature', 0)
-    temp_range = mars_data.get('tempRange', 0)
-    crustal_thickness = mars_data.get('crustalThickness', 0)
-    ferric = mars_data.get('ferric', 0)
-    pyroxene = mars_data.get('pyroxene', 0)
-    basalt = mars_data.get('basalt', 0)
-    lambert_albedo = mars_data.get('lambertAlbedo', 0)
-    
-    if model_name == 'slope':
-        # Slope model: 8 features
-        # ['Albedo', 'Day Side Thermal Inertia', 'Roughness', 'OMEGA Ferric/Dust 860nm ratio',
-        #  'Elevation_rolling_mean', 'Elevation_rolling_max_diff', 'Elevation_diff_abs', 'Elevation_diff2_abs']
-        features = [
-            albedo,                    # Albedo
-            temperature,               # Day Side Thermal Inertia (using temperature as proxy)
-            roughness,                 # Roughness
-            ferric,                    # OMEGA Ferric/Dust 860nm ratio
-            elevation,                 # Elevation_rolling_mean (simplified)
-            temp_range,                # Elevation_rolling_max_diff (using temp range as proxy)
-            abs(slope),                # Elevation_diff_abs (using slope as proxy)
-            abs(slope * 0.1)           # Elevation_diff2_abs (simplified)
-        ]
-        # Use saved scaler
-        if 'slope' in scalers:
-            features = scalers['slope'].transform([features])[0]
-        else:
-            # Fallback to manual normalization
-            features = [
-                features[0],                    # Albedo (0-1, already normalized)
-                features[1] / 100.0,            # Temperature (scale to roughly -1 to 1)
-                features[2] / 1000.0,           # Roughness (scale down)
-                features[3],                    # Ferric ratio (keep as is)
-                features[4] / 10000.0,          # Elevation (scale down)
-                features[5] / 200.0,            # Temp range (scale down)
-                features[6] / 10.0,             # Slope diff (scale down)
-                features[7] / 10.0              # Slope diff2 (scale down)
-            ]
-        
-    elif model_name == 'dust':
-        # Dust model: 6 features
-        # ["Elevation", "Slope", "Yearly Average Mars Surface Temperature", "Dayside Thermal Inertia", "MOLA 128ppd Aspect", "Albedo"]
-        features = [
-            elevation,                 # Elevation
-            slope,                     # Slope
-            temperature,               # Yearly Average Mars Surface Temperature
-            temperature,               # Dayside Thermal Inertia (using temperature as proxy)
-            slope,                     # MOLA 128ppd Aspect (using slope as proxy)
-            albedo                     # Albedo
-        ]
-        # Use saved scaler
-        if 'dust_feature' in scalers:
-            features = scalers['dust_feature'].transform([features])[0]
-        else:
-            # Fallback to manual normalization
-            features = [
-                features[0] / 10000.0,         # Elevation (scale down)
-                features[1] / 10.0,             # Slope (scale down)
-                features[2] / 100.0,            # Temperature (scale down)
-                features[3] / 100.0,            # Thermal inertia (scale down)
-                features[4] / 10.0,             # Aspect (scale down)
-                features[5]                     # Albedo (already normalized)
-            ]
-        
-    elif model_name == 'surface_temp':
-        # Surface temperature model: 5 features
-        # ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km']
-        features = [
-            elevation,                 # Elevation
-            albedo,                    # Albedo
-            temperature,               # Day Side Thermal Inertia (using temperature as proxy)
-            slope,                     # Slope
-            roughness                  # Roughness 0.6km
-        ]
-        # Use saved scaler
-        if 'surface_temp' in scalers:
-            features = scalers['surface_temp'].transform([features])[0]
-        else:
-            # Fallback to manual normalization
-            features = [
-                features[0] / 10000.0,         # Elevation (scale down)
-                features[1],                   # Albedo (already normalized)
-                features[2] / 100.0,           # Thermal inertia (scale down)
-                features[3] / 10.0,            # Slope (scale down)
-                features[4] / 1000.0           # Roughness (scale down)
-            ]
-        
-    elif model_name == 'thermal_inertia':
-        # Thermal inertia model: 8 features (same as slope)
-        features = [
-            albedo,                    # Albedo
-            temperature,               # Day Side Thermal Inertia (using temperature as proxy)
-            roughness,                 # Roughness
-            ferric,                    # OMEGA Ferric/Dust 860nm ratio
-            elevation,                 # Elevation_rolling_mean (simplified)
-            temp_range,                # Elevation_rolling_max_diff (using temp range as proxy)
-            abs(slope),                # Elevation_diff_abs (using slope as proxy)
-            abs(slope * 0.1)           # Elevation_diff2_abs (simplified)
-        ]
-        # Use saved transformer
-        if 'thermal_inertia_feature' in scalers:
-            features = scalers['thermal_inertia_feature'].transform([features])[0]
-        else:
-            # Fallback to manual normalization
-            features = [
-                features[0],                    # Albedo (0-1, already normalized)
-                features[1] / 100.0,            # Temperature (scale to roughly -1 to 1)
-                features[2] / 1000.0,           # Roughness (scale down)
-                features[3],                    # Ferric ratio (keep as is)
-                features[4] / 10000.0,          # Elevation (scale down)
-                features[5] / 200.0,            # Temp range (scale down)
-                features[6] / 10.0,             # Slope diff (scale down)
-                features[7] / 10.0              # Slope diff2 (scale down)
-            ]
-        
-    elif model_name == 'water':
-        # Water model: 8 features
-        # ['MOLA 128ppd Elevation', 'OMEGA Est. Lambert Albedo 1080nm', 'Dayside Thermal Inertia (20 ppd) (Putzig and Mellon 2007)', 
-        #  'TES Basalt Abundance - Numeric', 'Yearly Average Mars Surface Temperature', 'Latitude (N)', 'OMEGA Band depth at 2000 nm', 'Crustal Thickness (km)']
-        features = [
-            elevation,                 # MOLA 128ppd Elevation
-            lambert_albedo,            # OMEGA Est. Lambert Albedo 1080nm
-            temperature,               # Dayside Thermal Inertia (using temperature as proxy)
-            basalt,                    # TES Basalt Abundance - Numeric
-            temperature,               # Yearly Average Mars Surface Temperature
-            0,                         # Latitude (N) - not available in Mars data, use 0
-            pyroxene,                  # OMEGA Band depth at 2000 nm (using pyroxene as proxy)
-            crustal_thickness          # Crustal Thickness (km)
-        ]
-        # Use saved scaler
-        if 'water' in scalers:
-            features = scalers['water'].transform([features])[0]
-        else:
-            # Fallback to manual normalization
-            features = [
-                features[0] / 10000.0,         # Elevation (scale down)
-                features[1],                   # Lambert albedo (already normalized)
-                features[2] / 100.0,           # Thermal inertia (scale down)
-                features[3] / 100.0,          # Basalt abundance (scale down)
-                features[4] / 100.0,           # Temperature (scale down)
-                features[5],                   # Latitude (keep as is)
-                features[6],                   # Pyroxene (keep as is)
-                features[7] / 100.0            # Crustal thickness (scale down)
-            ]
-    
-    else:
-        # Default fallback
-        features = [0.0] * 8
-    
-    return np.array(features).reshape(1, -1)
-
 def predict_with_neural_networks(mars_data):
     """Use neural networks to predict properties (inverse-transformed to real units)"""
     try:
@@ -432,11 +272,23 @@ def predict_landing_suitability():
         reg_predictions = predict_with_regression_models(mars_data)
         print(f"Regression predictions: {reg_predictions}")
 
-        # Override specific targets with regressors per request
-        if 'surface_temp_xgb' in reg_predictions:
-            nn_predictions['surface_temp'] = reg_predictions['surface_temp_xgb']
-        if 'thermal_inertia_xgb' in reg_predictions:
-            nn_predictions['thermal_inertia'] = reg_predictions['thermal_inertia_xgb']
+        # Override specific targets with regressors only when values are plausible.
+        # (Some regressor outputs can be out-of-distribution / negative and get clamped to 0.)
+        overrides_applied = {}
+
+        surface_temp_xgb = reg_predictions.get('surface_temp_xgb', None)
+        if surface_temp_xgb is not None and np.isfinite(surface_temp_xgb):
+            # Mars surface temperatures are typically well below 0°C; keep a generous bound.
+            if -200.0 <= float(surface_temp_xgb) <= 50.0:
+                nn_predictions['surface_temp'] = float(surface_temp_xgb)
+                overrides_applied['surface_temp'] = 'surface_temp_xgb'
+
+        thermal_inertia_xgb = reg_predictions.get('thermal_inertia_xgb', None)
+        if thermal_inertia_xgb is not None and np.isfinite(thermal_inertia_xgb):
+            # Thermal inertia should not be negative; scoring expects ~100–400.
+            if 50.0 <= float(thermal_inertia_xgb) <= 2000.0:
+                nn_predictions['thermal_inertia'] = float(thermal_inertia_xgb)
+                overrides_applied['thermal_inertia'] = 'thermal_inertia_xgb'
 
         # Clamp to plausible ranges before scoring/response
         nn_predictions = _clamp_predictions(nn_predictions)
@@ -459,6 +311,7 @@ def predict_landing_suitability():
                 'neural_networks': nn_predictions,
                 'regression_models': reg_predictions
             },
+            'overrides_applied': overrides_applied,
             'raw_mars_data': mars_data
         }
         
