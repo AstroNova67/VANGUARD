@@ -190,7 +190,6 @@ VANGUARD/
 │   └── app.py                 # Flask API server
 ├── frontend/
 │   ├── 3d_globe/              # Interactive 3D Mars visualization
-│   └── website/               # Web interface
 ├── pyproject.toml             # Project configuration and dependencies
 ├── uv.lock                    # Locked dependency versions
 └── start_api.sh              # API startup script
@@ -241,7 +240,20 @@ The main endpoint combines predictions from all models and calculates a landing 
       "surface_temp": -42.3,
       "thermal_inertia": 450.2,
       "water": 0.05
+    },
+    "regression_models": {
+      "surface_temp_xgb": -44.8,
+      "thermal_inertia_xgb": 445.2
     }
+  },
+  "overrides_applied": {
+    "surface_temp": "surface_temp_xgb",
+    "thermal_inertia": "thermal_inertia_xgb"
+  },
+  "raw_mars_data": {
+    "lat": 15.23,
+    "lon": -45.67,
+    "elevation": 1234.56
   }
 }
 ```
@@ -292,7 +304,7 @@ print(f"Predictions: {result['predictions']}")
 ## Dependencies
 
 ### Backend
-- TensorFlow 2.16.2 - Machine learning framework
+- TensorFlow 2.16.2 - Machine learning framework (Linux) / tensorflow-macos (macOS)
 - scikit-learn 1.7.1 - Machine learning library
 - XGBoost 3.0.4 - Gradient boosting framework
 - Flask 2.3.3 - Web framework
