@@ -3,50 +3,202 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mars Explorer</title>
+    <title>VANGUARD — Mars landing analysis</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔴</text></svg>">
     <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
       body {
         margin: 0;
         overflow: hidden; /* keep canvas fullscreen */
-        font-family: sans-serif;
-        color: white;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        color: #e8f0f7;
+        -webkit-font-smoothing: antialiased;
       }
+
       #controls {
         position: absolute;
-        top: 10px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.5);
-        padding: 10px 14px;
-        border-radius: 8px;
-      }
-      #controls button {
-        background: #333;
-        color: white;
-        border: 1px solid #666;
-        border-radius: 6px;
-        padding: 5px 10px;
-        cursor: pointer;
-      }
-      #controls button:hover {
-        background: #444;
-      }
-      #coords {
-        margin-top: 12px;
-        font-size: 12px;
-        line-height: 1.3;
-        white-space: pre-line; /* allows newlines */
-        max-height: 400px;
+        top: 12px;
+        left: 12px;
+        max-width: min(580px, calc(100vw - 24px));
+        max-height: calc(100vh - 24px);
         overflow-y: auto;
-        background: rgba(0, 0, 0, 0.3);
-        padding: 10px;
-        border-radius: 6px;
-        border: 1px solid #444;
+        overflow-x: hidden;
+        width: 100%;
+        background: rgba(6, 14, 26, 0.94);
+        padding: 16px 18px 18px;
+        border-radius: 14px;
+        border: 1px solid rgba(120, 175, 220, 0.35);
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.55),
+          0 0 0 1px rgba(255, 200, 120, 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(120, 160, 200, 0.4) transparent;
       }
+
+      #controls::-webkit-scrollbar {
+        width: 8px;
+      }
+      #controls::-webkit-scrollbar-thumb {
+        background: rgba(120, 160, 200, 0.35);
+        border-radius: 4px;
+      }
+
+      .brand-block {
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      #controls h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        color: #9fd4ff;
+      }
+
+      .brand-tagline {
+        margin: 6px 0 0;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #7a9aad;
+        font-weight: 500;
+      }
+
+      .flow-hint {
+        margin: 12px 0 0;
+        padding: 10px 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #b0c8d8;
+        background: rgba(30, 55, 80, 0.45);
+        border-radius: 8px;
+        border: 1px solid rgba(120, 170, 210, 0.2);
+      }
+
+      .flow-hint strong {
+        color: #d4e8f5;
+        font-weight: 600;
+      }
+
+      .panel-section {
+        margin-top: 14px;
+      }
+
+      .panel-section:first-of-type {
+        margin-top: 0;
+      }
+
+      .panel-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6a9aba;
+        margin-bottom: 8px;
+      }
+
+      .control-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.22);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      #controls .btn-secondary {
+        background: linear-gradient(180deg, #3a4555 0%, #2a3340 100%);
+        color: #eef4fa;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease;
+      }
+
+      #controls .btn-secondary:hover {
+        background: linear-gradient(180deg, #485666 0%, #353f4e 100%);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .sun-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 160px;
+      }
+
+      .sun-row label {
+        font-size: 12px;
+        color: #9bb0c0;
+        white-space: nowrap;
+      }
+
+      #coords {
+        margin-top: 0;
+        font-size: 12.5px;
+        line-height: 1.5;
+        white-space: pre-line;
+        max-height: min(280px, 36vh);
+        overflow-y: auto;
+        overflow-x: auto;
+        background: rgba(0, 0, 0, 0.35);
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #d2e4f0;
+        scrollbar-width: thin;
+      }
+
+      #coords:not(.coords--empty) {
+        font-variant-numeric: tabular-nums;
+      }
+
+      #coords.coords--empty {
+        color: #7a95a8;
+      }
+
+      .coords-placeholder {
+        color: #7a95a8;
+        line-height: 1.55;
+        display: block;
+      }
+
+      .pred-raw-hint code {
+        font-size: 10px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #c5dde8;
+      }
+
       /* === Red Slider Styling === */
       #sunAngle {
         -webkit-appearance: none;
-        width: 150px;
+        flex: 1;
+        min-width: 100px;
+        max-width: 200px;
         height: 8px;
         background: #ff4d4d; /* red track */
         border-radius: 5px;
@@ -71,6 +223,527 @@
         cursor: pointer;
         border: none;
       }
+
+      #predictLanding {
+        margin-top: 0;
+        width: 100%;
+        max-width: none;
+        padding: 14px 18px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        background: linear-gradient(180deg, #d4883a 0%, #b86a1e 40%, #8a4a0c 100%);
+        color: #fffaf4;
+        border: 1px solid rgba(255, 210, 140, 0.75);
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.35),
+          0 6px 20px rgba(200, 100, 30, 0.4),
+          inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.2s ease,
+          filter 0.2s ease,
+          border-color 0.2s ease;
+      }
+
+      .predict-hint {
+        margin-top: 8px;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #6d8a9c;
+      }
+      #predictLanding:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+        border-color: rgba(255, 220, 160, 0.95);
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.25),
+          0 6px 22px rgba(255, 160, 60, 0.55),
+          0 0 28px rgba(255, 180, 80, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      }
+      #predictLanding:active:not(:disabled) {
+        transform: translateY(0);
+        filter: brightness(0.98);
+      }
+      #predictLanding:disabled {
+        opacity: 0.55;
+        cursor: wait;
+        filter: grayscale(0.25);
+      }
+
+      #landingScore {
+        margin-top: 14px;
+        max-width: none;
+        font-weight: normal;
+        color: #c8e6c9;
+      }
+
+      .pred-panel {
+        margin-top: 0;
+        padding: 16px 14px 14px;
+        background: rgba(4, 12, 24, 0.97);
+        border: 1px solid rgba(230, 165, 85, 0.5);
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #b8d4e8;
+        box-shadow:
+          0 6px 28px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(255, 180, 90, 0.1),
+          0 0 24px rgba(230, 130, 50, 0.18);
+      }
+
+      .pred-score-card {
+        padding: 12px 14px;
+        margin: -4px -6px 14px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .pred-lead {
+        margin: 0 0 10px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #8aa8bc;
+        font-weight: 500;
+      }
+
+      .pred-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        margin-bottom: 12px;
+        padding: 8px 10px;
+        font-size: 10px;
+        line-height: 1.4;
+        color: #6d8a9c;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .pred-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .pred-legend-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .pred-legend-dot--obs {
+        background: #6ecf9b;
+      }
+      .pred-legend-dot--nn {
+        background: #6eb3ff;
+      }
+      .pred-legend-dot--xgb {
+        background: #ffb86b;
+      }
+
+      .pred-legend-dot--score {
+        border-radius: 3px;
+        width: 10px;
+        height: 10px;
+        background: rgba(255, 185, 90, 0.35);
+        box-shadow: 0 0 0 1px rgba(255, 190, 120, 0.75);
+      }
+
+      .pred-grid-scroll {
+        overflow-x: auto;
+        margin: 0 -4px;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(140, 170, 200, 0.35) transparent;
+      }
+
+      .pred-grid-scroll::-webkit-scrollbar {
+        height: 6px;
+      }
+      .pred-grid-scroll::-webkit-scrollbar-thumb {
+        background: rgba(140, 170, 200, 0.35);
+        border-radius: 3px;
+      }
+
+      .pred-panel--error {
+        border-color: rgba(220, 80, 80, 0.65) !important;
+        color: #ffcdd2 !important;
+        box-shadow:
+          0 4px 20px rgba(0, 0, 0, 0.45),
+          0 0 16px rgba(220, 60, 60, 0.2) !important;
+      }
+
+      .pred-score {
+        font-size: 19px;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: 0.02em;
+        transition: color 0.2s ease, text-shadow 0.2s ease;
+      }
+
+      /* Landing score color bands: green >50%, yellow 30–50%, red <30% */
+      .pred-panel--score-low .pred-score {
+        color: #e57373;
+        text-shadow: 0 0 12px rgba(229, 115, 115, 0.35);
+      }
+      .pred-panel--score-mid .pred-score {
+        color: #ffcc66;
+        text-shadow: 0 0 14px rgba(255, 200, 80, 0.4);
+      }
+      .pred-panel--score-high .pred-score {
+        color: #81c784;
+        text-shadow: 0 0 12px rgba(129, 199, 132, 0.35);
+      }
+
+      .pred-score-note {
+        font-weight: 500;
+        opacity: 0.88;
+      }
+
+      .pred-grid {
+        display: grid;
+        grid-template-columns: minmax(108px, 1fr) minmax(108px, 1fr) minmax(108px, 1fr);
+        gap: 8px 0;
+        column-gap: 12px;
+        align-items: start;
+        min-width: min(100%, 340px);
+      }
+
+      .pred-col {
+        min-width: 0;
+        padding: 0 4px;
+      }
+
+      .pred-col--obs {
+        border-right: 1px solid rgba(120, 200, 160, 0.22);
+        padding-right: 10px;
+        margin-right: 2px;
+      }
+
+      .pred-col--nn {
+        border-right: 1px solid rgba(120, 180, 220, 0.22);
+        padding-right: 10px;
+        margin-right: 2px;
+      }
+
+      .pred-col--xgb {
+        padding-left: 2px;
+      }
+
+      .pred-col-title {
+        font-size: 9px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        line-height: 1.35;
+        margin-bottom: 8px;
+        padding: 8px 8px;
+        border-radius: 8px;
+        border-bottom: 2px solid transparent;
+      }
+
+      .pred-col-title-short {
+        display: block;
+      }
+
+      .pred-col-title-long {
+        display: none;
+      }
+
+      @media (min-width: 480px) {
+        .pred-col-title-short {
+          display: none;
+        }
+        .pred-col-title-long {
+          display: block;
+        }
+      }
+
+      .pred-col-title--nn {
+        color: #9fd4ff;
+        background: linear-gradient(180deg, rgba(40, 90, 140, 0.35) 0%, rgba(20, 50, 90, 0.2) 100%);
+        border-bottom-color: rgba(120, 190, 255, 0.4);
+        box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .pred-col-title--obs {
+        color: #9fe8c8;
+        background: linear-gradient(180deg, rgba(40, 100, 70, 0.38) 0%, rgba(20, 60, 45, 0.22) 100%);
+        border-bottom-color: rgba(120, 220, 160, 0.42);
+        box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .pred-col-title--xgb {
+        color: #ffd59a;
+        background: linear-gradient(180deg, rgba(140, 90, 40, 0.35) 0%, rgba(80, 50, 20, 0.22) 100%);
+        border-bottom-color: rgba(255, 190, 120, 0.45);
+        box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .pred-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        padding: 6px 4px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        font-variant-numeric: tabular-nums;
+      }
+      .pred-row:last-child {
+        border-bottom: none;
+      }
+
+      .pred-row:hover {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 4px;
+      }
+
+      .pred-label {
+        color: #95b0c4;
+        flex-shrink: 1;
+        font-size: 11.5px;
+        line-height: 1.35;
+        min-width: 0;
+      }
+
+      .pred-value {
+        color: #f0f6fb;
+        text-align: right;
+        word-break: break-word;
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+
+      .pred-value--obs {
+        color: #c8ead8;
+      }
+
+      .pred-value--xgb {
+        color: #ffe8d0;
+      }
+
+      .pred-value--for-landing-score {
+        background: rgba(255, 175, 80, 0.12);
+        box-shadow: 0 0 0 1px rgba(255, 190, 120, 0.55);
+        border-radius: 8px;
+        padding: 4px 6px 5px;
+        margin: -2px -4px;
+        display: inline-block;
+        max-width: 100%;
+        vertical-align: top;
+        text-align: right;
+      }
+
+      .pred-score-pin {
+        display: block;
+        margin-top: 5px;
+        font-size: 8.5px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #f0b050;
+        line-height: 1.25;
+      }
+
+      .pred-score-pin--xgb {
+        color: #ffcc88;
+      }
+
+      .pred-value--nn.pred-value--delta-good {
+        box-shadow: inset 3px 0 0 rgba(129, 199, 132, 0.75);
+        padding-left: 6px;
+        margin-left: -6px;
+        border-radius: 4px;
+      }
+
+      .pred-value--nn.pred-value--delta-mid {
+        box-shadow: inset 3px 0 0 rgba(255, 204, 102, 0.8);
+        padding-left: 6px;
+        margin-left: -6px;
+        border-radius: 4px;
+      }
+
+      .pred-value--nn.pred-value--delta-warn {
+        box-shadow: inset 3px 0 0 rgba(229, 115, 115, 0.85);
+        padding-left: 6px;
+        margin-left: -6px;
+        border-radius: 4px;
+      }
+
+      .pred-delta {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        margin-left: 4px;
+        vertical-align: baseline;
+        opacity: 0.95;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .pred-delta--good {
+        color: #81c784;
+      }
+
+      .pred-delta--mid {
+        color: #ffcc66;
+      }
+
+      .pred-delta--warn {
+        color: #e57373;
+      }
+
+      .pred-panel--loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: #9bb8d0;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 22px 16px;
+      }
+
+      .pred-loading-spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(120, 170, 220, 0.25);
+        border-top-color: #7eb8d8;
+        border-radius: 50%;
+        animation: pred-spin 0.7s linear infinite;
+      }
+
+      @keyframes pred-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .pred-details {
+        margin-top: 12px;
+        font-size: 11px;
+      }
+
+      .pred-details summary {
+        cursor: pointer;
+        color: #8ec8e8;
+        font-weight: 600;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        user-select: none;
+        list-style: none;
+      }
+
+      .pred-details summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .pred-details summary::after {
+        content: "▸";
+        float: right;
+        opacity: 0.6;
+        transition: transform 0.2s ease;
+      }
+
+      .pred-details[open] summary::after {
+        transform: rotate(90deg);
+      }
+
+      .pred-details summary:hover {
+        background: rgba(255, 255, 255, 0.07);
+        color: #a8daf8;
+      }
+
+      .pred-details-body {
+        margin-top: 8px;
+        padding: 10px 12px;
+        font-size: 11px;
+        line-height: 1.55;
+        color: #7a9aad;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .pred-footnote {
+        margin-top: 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #7a9aad;
+      }
+
+      .pred-footnote--raster {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        color: #6d8a9c;
+      }
+
+      .pred-raw {
+        margin-top: 10px;
+      }
+
+      .pred-raw details {
+        font-size: 11px;
+      }
+
+      .pred-raw summary {
+        cursor: pointer;
+        color: #8ec8e8;
+        font-weight: 600;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        user-select: none;
+        list-style: none;
+      }
+
+      .pred-raw summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .pred-raw summary::after {
+        content: "▸";
+        float: right;
+        opacity: 0.55;
+      }
+
+      .pred-raw details[open] summary::after {
+        display: inline-block;
+        transform: rotate(90deg);
+      }
+
+      .pred-raw pre {
+        margin: 8px 0 0;
+        padding: 12px 14px;
+        max-height: min(48vh, 380px);
+        overflow: auto;
+        font-size: 11px;
+        line-height: 1.45;
+        background: rgba(0, 0, 0, 0.45);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #b0ccd8;
+        scrollbar-gutter: stable;
+      }
+
+      .pred-raw-hint {
+        margin: 6px 2px 0;
+        font-size: 10px;
+        color: #5d7a8c;
+      }
     </style>
 
     <!-- Import maps for modules -->
@@ -90,16 +763,41 @@
   <body>
     <!-- 🌞 UI Controls for Sun + Data -->
     <div id="controls">
-      <button id="toggleSun">Toggle Sun Rotation</button><br><br>
-      <label for="sunAngle">Sun Angle:</label>
-      <input id="sunAngle" type="range" min="0" max="360" value="0">
+      <header class="brand-block">
+        <h1>VANGUARD</h1>
+        <p class="brand-tagline">Mars landing-site explorer — click the globe, then run a suitability prediction.</p>
+        <p class="flow-hint">
+          <strong>1.</strong> Click Mars &nbsp;·&nbsp; <strong>2.</strong> Check the readings &nbsp;·&nbsp;
+          <strong>3.</strong> Predict
+        </p>
+      </header>
 
-      <!-- Mars Data Display -->
-      <div id="coords">Click anywhere on Mars to see all dataset values</div>
-      
-      <!-- Landing Suitability Prediction -->
-      <button id="predictLanding" style="margin-top: 10px; display: none;">Predict Landing Suitability</button>
-      <div id="landingScore" style="margin-top: 10px; font-weight: bold; color: #4CAF50;"></div>
+      <section class="panel-section" aria-label="Lighting">
+        <div class="panel-section-title">Scene</div>
+        <div class="control-card">
+          <button type="button" class="btn-secondary" id="toggleSun">Pause / resume sun</button>
+          <div class="sun-row">
+            <label for="sunAngle">Sun angle</label>
+            <input id="sunAngle" type="range" min="0" max="360" value="0" aria-label="Sun angle" />
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-label="Sampled rasters">
+        <div class="panel-section-title">Values at this click</div>
+        <div id="coords" class="coords--empty">
+          <span class="coords-placeholder">Click anywhere on Mars. Raster values for that point will show here (all layers load on first click).</span>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-label="Prediction">
+        <div class="panel-section-title">Landing prediction</div>
+        <button type="button" id="predictLanding" style="display: none;">Run landing suitability</button>
+        <p class="predict-hint" id="predictHint" style="display: none">
+          Uses neural models plus XGBoost where available. The table compares rasters you sampled to model outputs.
+        </p>
+        <div id="landingScore"></div>
+      </section>
     </div>
 
     <!-- Load GeoTIFF as global -->

@@ -1,13 +1,43 @@
+import logging
+import mimetypes
+import os
+import pickle
+import sys
+import warnings
+
+# Pickled scalers may be one sklearn micro-version off from the installed wheel; suppress noisy UI.
+try:
+    from sklearn.exceptions import InconsistentVersionWarning
+
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except ImportError:
+    pass
+
+# Quieter TensorFlow C++ logs (must be set before importing tensorflow).
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import numpy as np
 import tensorflow as tf
 import keras
-import pickle
-import json
-import os
-import sys
-import mimetypes
+
+
+def _verbose() -> bool:
+    return os.environ.get("VANGUARD_VERBOSE", "").strip().lower() in ("1", "true", "yes")
+
+
+def _log_debug(msg: str) -> None:
+    if _verbose():
+        print(msg, flush=True)
+
+
+def _log_info(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def _log_error(msg: str) -> None:
+    print(msg, file=sys.stderr, flush=True)
 
 # Optimize TensorFlow memory usage for production
 # Limit GPU memory growth (if GPU available)
@@ -34,6 +64,10 @@ except ImportError:
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
+
+# Default: quiet Werkzeug (set VANGUARD_VERBOSE=1 for request logs).
+if not _verbose():
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 # Global variables to store loaded models
 neural_models = {}
@@ -63,6 +97,79 @@ def _clamp_predictions(preds: dict) -> dict:
         out['water'] = float(min(8.0, max(0.0, out['water'])))
     return out
 
+
+def _finite_number(x) -> bool:
+    if x is None:
+        return False
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return False
+    return bool(np.isfinite(f))
+
+
+def _fuse_surface_temp_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
+    """
+    Choose NN vs XGB for landing score.
+    When raster `temperature` is present in the payload, pick whichever prediction is
+    closest to it (among physically plausible candidates). Otherwise prefer XGB when
+    in range, matching the previous API behavior.
+    Returns (value_for_score, overrides_applied_key_or_None).
+    """
+    obs = mars_data.get("temperature")
+    nn_ok = _finite_number(nn_val)
+    xgb_ok = _finite_number(xgb_val) and -200.0 <= float(xgb_val) <= 50.0
+
+    if _finite_number(obs):
+        obs_f = float(obs)
+        candidates = []
+        if nn_ok:
+            candidates.append(("nn", float(nn_val), abs(float(nn_val) - obs_f)))
+        if xgb_ok:
+            candidates.append(("xgb", float(xgb_val), abs(float(xgb_val) - obs_f)))
+        if not candidates:
+            return (float(nn_val) if nn_ok else 0.0, None)
+        # Min error; tie-break prefers XGB
+        candidates.sort(key=lambda t: (t[2], 0 if t[0] == "xgb" else 1))
+        winner, val, _ = candidates[0]
+        src = "surface_temp_xgb" if winner == "xgb" else "surface_temp_nn"
+        return (val, src)
+
+    if xgb_ok:
+        return (float(xgb_val), "surface_temp_xgb")
+    return (float(nn_val) if nn_ok else 0.0, None)
+
+
+def _fuse_thermal_inertia_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
+    """
+    Same pattern as surface temp. Uses optional `thermalInertia` or `thermal_inertia`
+    in the request when present (not sent by the current globe UI); otherwise XGB when
+    in [50, 2000], else neural.
+    """
+    obs = mars_data.get("thermalInertia")
+    if obs is None:
+        obs = mars_data.get("thermal_inertia")
+    nn_ok = _finite_number(nn_val)
+    xgb_ok = _finite_number(xgb_val) and 50.0 <= float(xgb_val) <= 2000.0
+
+    if _finite_number(obs):
+        obs_f = float(obs)
+        candidates = []
+        if nn_ok:
+            candidates.append(("nn", float(nn_val), abs(float(nn_val) - obs_f)))
+        if xgb_ok:
+            candidates.append(("xgb", float(xgb_val), abs(float(xgb_val) - obs_f)))
+        if not candidates:
+            return (float(nn_val) if nn_ok else 0.0, None)
+        candidates.sort(key=lambda t: (t[2], 0 if t[0] == "xgb" else 1))
+        src = "thermal_inertia_xgb" if candidates[0][0] == "xgb" else "thermal_inertia_nn"
+        return (candidates[0][1], src)
+
+    if xgb_ok:
+        return (float(xgb_val), "thermal_inertia_xgb")
+    return (float(nn_val) if nn_ok else 0.0, None)
+
+
 def load_scalers():
     """Load all saved scalers and transformers"""
     global scalers
@@ -72,38 +179,38 @@ def load_scalers():
         # Load slope scaler
         with open(f'{scaler_dir}/slope_scaler.pkl', 'rb') as f:
             scalers['slope'] = pickle.load(f)
-        print("✅ Loaded slope scaler")
+        _log_debug("  scaler: slope")
         
         # Load dust scalers
         with open(f'{scaler_dir}/dust_feature_scaler.pkl', 'rb') as f:
             scalers['dust_feature'] = pickle.load(f)
         with open(f'{scaler_dir}/dust_target_transformer.pkl', 'rb') as f:
             scalers['dust_target'] = pickle.load(f)
-        print("✅ Loaded dust scalers")
+        _log_debug("  scaler: dust (feature + target)")
         
         # Load surface temperature scaler
         with open(f'{scaler_dir}/surface_temp_scaler.pkl', 'rb') as f:
             scalers['surface_temp'] = pickle.load(f)
         with open(f'{scaler_dir}/surface_temp_y_min.pkl', 'rb') as f:
             scalers['surface_temp_y_min'] = pickle.load(f)
-        print("✅ Loaded surface temperature scaler")
+        _log_debug("  scaler: surface_temp")
         
         # Load thermal inertia transformers
         with open(f'{scaler_dir}/thermal_inertia_feature_transformer.pkl', 'rb') as f:
             scalers['thermal_inertia_feature'] = pickle.load(f)
         with open(f'{scaler_dir}/thermal_inertia_target_transformer.pkl', 'rb') as f:
             scalers['thermal_inertia_target'] = pickle.load(f)
-        print("✅ Loaded thermal inertia transformers")
+        _log_debug("  scaler: thermal_inertia")
         
         # Load water scaler
         with open(f'{scaler_dir}/water_scaler.pkl', 'rb') as f:
             scalers['water'] = pickle.load(f)
-        print("✅ Loaded water scaler")
+        _log_debug("  scaler: water")
         
-        print(f"📊 Loaded {len(scalers)} scalers and transformers")
+        _log_info(f"  Scalers loaded ({len(scalers)} items)")
         
     except Exception as e:
-        print(f"❌ Error loading scalers: {e}")
+        _log_error(f"Error loading scalers: {e}")
         scalers = {}
 
 def load_models():
@@ -125,9 +232,9 @@ def load_models():
     for model_name, model_path in model_paths.items():
         try:
             neural_models[model_name] = keras.models.load_model(model_path)
-            print(f"✅ Loaded {model_name} model")
+            _log_debug(f"  neural net: {model_name}")
         except Exception as e:
-            print(f"❌ Failed to load {model_name} model: {e}")
+            _log_error(f"Failed to load neural net '{model_name}': {e}")
     
     # Try to load Regression models
     try:
@@ -150,12 +257,16 @@ def load_models():
             os.path.join(BASE_DIR, 'saved_models', 'regression_models', 'thermal_inertia', 'xgb_model.json')
         )
         
-        print("✅ Regression models loaded successfully")
+        _log_debug("  regression: surface_temp + thermal_inertia (XGB)")
     except Exception as e:
-        print(f"❌ Error loading regression models: {e}")
+        _log_error(f"Error loading regression models: {e}")
         regression_models = {}
     
-    print(f"📊 Loaded {len(neural_models)} neural network models and {len(regression_models)} regression model types")
+    reg_ok = bool(regression_models)
+    _log_info(
+        f"  Neural nets: {len(neural_models)}/5 loaded"
+        + ("; regression: ok" if reg_ok else "; regression: unavailable")
+    )
 
 def predict_with_neural_networks(mars_data):
     """Use neural networks to predict properties (inverse-transformed to real units)"""
@@ -169,7 +280,7 @@ def predict_with_neural_networks(mars_data):
             'water': float(water)
         }
     except Exception as e:
-        print(f"Error in predict_with_neural_networks: {e}")
+        _log_error(f"Error in predict_with_neural_networks: {e}")
         return {
             'slope': 0.0,
             'dust': 0.0,
@@ -186,7 +297,7 @@ def predict_with_regression_models(mars_data):
     
     if len(regression_models) == 0:
         # Provide mock predictions when models fail to load
-        print("⚠️ Using mock regression predictions (models not loaded)")
+        _log_debug("Using mock regression predictions (models not loaded)")
         predictions = {
             'surface_temp_xgb': -44.8,
             'thermal_inertia_xgb': 445.2
@@ -205,7 +316,7 @@ def predict_with_regression_models(mars_data):
                 xgb_pred = regression_models['surface_temp']['xgb'].predict(features)[0]
                 predictions['surface_temp_xgb'] = float(xgb_pred)
             except Exception as e:
-                print(f"Error predicting surface_temp with XGB: {e}")
+                _log_error(f"Error predicting surface_temp with XGB: {e}")
                 predictions['surface_temp_xgb'] = 0.0
         
         # Thermal inertia predictions (4 features: temp_range, albedo, slope, ferric)
@@ -225,7 +336,7 @@ def predict_with_regression_models(mars_data):
                 xgb_pred = regression_models['thermal_inertia']['xgb'].predict(features)[0]
                 predictions['thermal_inertia_xgb'] = float(xgb_pred)
             except Exception as e:
-                print(f"Error predicting thermal_inertia with XGB: {e}")
+                _log_error(f"Error predicting thermal_inertia with XGB: {e}")
                 predictions['thermal_inertia_xgb'] = 0.0
     
     return predictions
@@ -234,11 +345,9 @@ def predict_with_regression_models(mars_data):
 def predict_landing_suitability():
     """Main API endpoint for landing suitability prediction"""
     try:
-        print("📥 Received prediction request")
-        
         # Check if models are loaded
         if not models_loaded:
-            print("⚠️ Models not loaded yet")
+            _log_error("Models not loaded yet (503)")
             return jsonify({
                 'success': False,
                 'error': 'Models are still loading. Please try again in a moment.',
@@ -262,53 +371,67 @@ def predict_landing_suitability():
                 'landing_score': 0
             }), 400
         
-        print(f"Received Mars data: {mars_data}")
-        
-        # Get predictions from neural networks
-        nn_predictions = predict_with_neural_networks(mars_data)
-        print(f"Neural network predictions: {nn_predictions}")
-        
-        # Get predictions from regression models
-        reg_predictions = predict_with_regression_models(mars_data)
-        print(f"Regression predictions: {reg_predictions}")
+        # Pure neural-network outputs (clamped for display; no XGB override).
+        nn_baseline = _clamp_predictions(predict_with_neural_networks(mars_data))
 
-        # Override specific targets with regressors only when values are plausible.
-        # (Some regressor outputs can be out-of-distribution / negative and get clamped to 0.)
+        # Fused predictions: start from NN, optionally replace temp / TI with XGB when plausible.
+        fused_predictions = dict(nn_baseline)
+        reg_predictions = predict_with_regression_models(mars_data)
+
         overrides_applied = {}
 
-        surface_temp_xgb = reg_predictions.get('surface_temp_xgb', None)
-        if surface_temp_xgb is not None and np.isfinite(surface_temp_xgb):
-            # Mars surface temperatures are typically well below 0°C; keep a generous bound.
-            if -200.0 <= float(surface_temp_xgb) <= 50.0:
-                nn_predictions['surface_temp'] = float(surface_temp_xgb)
-                overrides_applied['surface_temp'] = 'surface_temp_xgb'
+        surface_temp_xgb = reg_predictions.get("surface_temp_xgb", None)
+        st_val, st_src = _fuse_surface_temp_for_score(
+            nn_baseline.get("surface_temp"),
+            surface_temp_xgb,
+            mars_data,
+        )
+        fused_predictions["surface_temp"] = st_val
+        if st_src is not None:
+            overrides_applied["surface_temp"] = st_src
 
-        thermal_inertia_xgb = reg_predictions.get('thermal_inertia_xgb', None)
-        if thermal_inertia_xgb is not None and np.isfinite(thermal_inertia_xgb):
-            # Thermal inertia should not be negative; scoring expects ~100–400.
-            if 50.0 <= float(thermal_inertia_xgb) <= 2000.0:
-                nn_predictions['thermal_inertia'] = float(thermal_inertia_xgb)
-                overrides_applied['thermal_inertia'] = 'thermal_inertia_xgb'
+        thermal_inertia_xgb = reg_predictions.get("thermal_inertia_xgb", None)
+        ti_val, ti_src = _fuse_thermal_inertia_for_score(
+            nn_baseline.get("thermal_inertia"),
+            thermal_inertia_xgb,
+            mars_data,
+        )
+        fused_predictions["thermal_inertia"] = ti_val
+        if ti_src is not None:
+            overrides_applied["thermal_inertia"] = ti_src
 
-        # Clamp to plausible ranges before scoring/response
-        nn_predictions = _clamp_predictions(nn_predictions)
+        fused_predictions = _clamp_predictions(fused_predictions)
         
-        # Calculate landing score using neural network predictions
+        # Landing score: LandingSuitabilityScorer matches LANDING_SCORING_SOURCES.md
+        # (weights 30/20/20/20/10, normalization ranges, slope/dust inverted).
+        # Inputs are the final fused + clamped property predictions used in the API response.
         scorer = LandingSuitabilityScorer()
         landing_score = scorer.score_site(
-            slope=nn_predictions.get('slope', 0),
-            dust=nn_predictions.get('dust', 0),
-            surface_temp=nn_predictions.get('surface_temp', 0),
-            thermal_inertia=nn_predictions.get('thermal_inertia', 0),
-            water=nn_predictions.get('water', 0)
+            slope=fused_predictions.get('slope', 0),
+            dust=fused_predictions.get('dust', 0),
+            surface_temp=fused_predictions.get('surface_temp', 0),
+            thermal_inertia=fused_predictions.get('thermal_inertia', 0),
+            water=fused_predictions.get('water', 0)
         )
+
+        lat = mars_data.get("lat")
+        lon = mars_data.get("lon")
+        loc = ""
+        if lat is not None and lon is not None:
+            loc = f" lat={lat} lon={lon}"
+        _log_info(f"POST /predict → landing_score={landing_score}%{loc}")
+        _log_debug(f"  fused: {fused_predictions}")
+        _log_debug(f"  regression: {reg_predictions} overrides={overrides_applied}")
         
         # Prepare response
         response = {
             'success': True,
             'landing_score': landing_score,
             'predictions': {
-                'neural_networks': nn_predictions,
+                # Fused values used for landing_score (XGB may override temp / thermal inertia).
+                'neural_networks': fused_predictions,
+                # Neural nets only (before XGB override), for side-by-side UI.
+                'neural_networks_baseline': nn_baseline,
                 'regression_models': reg_predictions
             },
             'overrides_applied': overrides_applied,
@@ -320,8 +443,7 @@ def predict_landing_suitability():
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"Error in prediction: {e}")
-        print(f"Traceback: {error_trace}")
+        _log_error(f"Error in prediction: {e}\n{error_trace}")
         return jsonify({
             'success': False,
             'error': str(e),
@@ -341,8 +463,7 @@ def internal_error(error):
 def handle_exception(e):
     import traceback
     error_trace = traceback.format_exc()
-    print(f"Unhandled exception: {e}")
-    print(f"Traceback: {error_trace}")
+    _log_error(f"Unhandled exception: {e}\n{error_trace}")
     return jsonify({
         'success': False,
         'error': str(e),
@@ -394,7 +515,7 @@ def serve_frontend(path):
         if not file_path_abs.startswith(frontend_dir_abs):
             return jsonify({'error': 'Access denied'}), 403
     except Exception as e:
-        print(f"Error checking file path security: {e}")
+        _log_error(f"Error checking file path security: {e}")
         return jsonify({'error': 'Invalid path'}), 400
     
     # If it's a file, serve it
@@ -410,7 +531,7 @@ def serve_frontend(path):
         else:
             mimetype, _ = mimetypes.guess_type(file_path)
         
-        print(f"Serving file: {path} (mimetype: {mimetype})")
+        _log_debug(f"Serving static: {path}")
         return send_file(file_path, mimetype=mimetype)
     
     # If it's a directory, try to serve index.html from it (for SPA routing)
@@ -420,29 +541,30 @@ def serve_frontend(path):
             return send_file(index_path)
     
     # File not found - log for debugging
-    print(f"File not found: {path} (resolved to: {file_path})")
+    _log_debug(f"File not found: {path}")
     return jsonify({'error': 'File not found', 'path': path}), 404
 
 # Load models and scalers when module is imported (works with both Flask dev server and gunicorn)
 # This ensures models are loaded in production (gunicorn) where __main__ doesn't run
-# Note: This may take 30-60 seconds on Render free tier, but it ensures models are ready
-print("🚀 Loading VANGUARD models and scalers...")
+_log_info("VANGUARD — loading models (this may take a minute)…")
 try:
     load_scalers()
     load_models()
     models_loaded = True
-    print("✅ All models and scalers loaded!")
+    _log_info("VANGUARD — models ready.")
 except Exception as e:
-    print(f"❌ Error loading models at startup: {e}")
+    _log_error(f"VANGUARD — failed to load models: {e}")
     models_loaded = False
 
 if __name__ == '__main__':
-    print("🚀 Starting Mars Landing Suitability Website...")
-    
-    # Use PORT environment variable (Render provides this) or default to 5002
     port = int(os.environ.get('PORT', 5002))
     debug = os.environ.get('FLASK_ENV') != 'production'
-    
-    print(f"🌍 Website ready! Access at http://0.0.0.0:{port}")
-    print("📡 API endpoints available at /predict")
+    _log_info("")
+    _log_info("  Open in browser:  http://127.0.0.1:" + str(port))
+    _log_info("  Predict endpoint: POST http://127.0.0.1:" + str(port) + "/predict")
+    if _verbose():
+        _log_info("  (VANGUARD_VERBOSE=1 — debug logging on)")
+    else:
+        _log_info("  Tip: set VANGUARD_VERBOSE=1 for detailed logs and HTTP access logs.")
+    _log_info("  Press Ctrl+C to stop.\n")
     app.run(debug=debug, host='0.0.0.0', port=port)

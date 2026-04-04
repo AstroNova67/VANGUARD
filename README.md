@@ -1,15 +1,13 @@
 # V.A.N.G.U.A.R.D
 **Visual & Analytical Navigation for Geospatial Understanding And Rover Deployment**
 
-> **Local development demo (current)**: The app is currently intended to be run locally.
-
-<img src="assets/vanguard-demo.png" width="1100" alt="VANGUARD demo screenshot (local development)" />
+<img src="assets/vanguard-demo.png" width="1100" alt="VANGUARD Mars globe with landing prediction panel: observed rasters vs neural vs XGB, landing suitability score, and score-source highlights" />
 
 ## Overview
 
-Our goal is to leverage martian data from JMARS to build machine learning models that predict key surface and environmental attributes of Mars. These models aim to support the identification of ideal landing sites for future missions, based on scientific and engineering criteria.
+Our goal is to leverage Martian geospatial data to build machine learning models that predict key surface and environmental attributes of Mars. These models aim to support the identification of interesting landing-site candidates for future missions, based on scientific and engineering-style criteria.
 
-By extracting and analyzing datasets such as **elevation**, **albedo**, **slope**, **thermal inertia**, and **surface roughness** from JMARS, we can train models that learn patterns associated with terrain suitability. These predictions can then guide the selection of potential landing zones that balance safety, scientific value, and accessibility.
+The **3D globe** loads **bundled GeoTIFFs** under `frontend/3d_globe/public/data/`, samples them at the clicked lat/lon, and sends those values to `POST /predict`. **Live UI path:** **GeoTIFF → JSON features → neural nets + XGB (where available) → fused properties → landing score** (`backend/scoring.py`).
 
 ## Objectives
 
@@ -29,14 +27,16 @@ By extracting and analyzing datasets such as **elevation**, **albedo**, **slope*
 - **Water Content**: Estimates water equivalent hydrogen (WEH) percentage
 
 ### 3D Visualization
-- **Interactive 3D Globe**: Rotate and zoom Mars using orbit controls
-- **Surface Feature Visualization**: Displays Mars surface data layers
-- **Real-time Data Integration**: Connects ML predictions to visual interface
+- **Interactive 3D globe** (Three.js): orbit controls, optional sun lighting
+- **Per-click GeoTIFF sampling**: each registered layer is read at the clicked point (elevation, slope, temperature, etc.); values appear as a text list in the side panel
+- **Landing prediction panel**: after **Predict landing suitability**, shows **landing %**, a **three-column** table (**Observed (raster)** vs **Neural networks** vs **Regression (XGBoost)**), fusion footnotes, optional **Δ** badges where a raster value exists for that row, and an expandable **raw JSON** payload
 
-### Web Interface
-- **Point-and-Click Analysis**: Select locations on Mars for analysis
-- **Module Descriptions**: Detailed explanations of each prediction model
-- **Data Visualization**: Charts and graphs of Mars surface properties
+### Web Interface (what the app actually shows)
+- **Point-and-click** on the globe → numeric **raster-derived** properties for that location
+- **One-button** call to `POST /predict` (same origin as the page when you use the Flask server below)
+- **No separate charting dashboard** in the globe UI (no built-in plots); exploration is tabular / text plus the 3D view
+
+**Observed column:** Raster values in the prediction table mirror fields in the JSON body to `/predict`. **Dust (observed)** uses the **OMEGA ferric/dust** raster (`omega_ferric_nnphs.tif`): the same sampled value is sent as **`ferric`** (model input) and duplicated as **`dustObserved`** for the table. **Slope** and **surface temperature** come from the MOLA/HRSC slope and yearly-average temperature GeoTIFFs. **Thermal inertia (observed)** is sampled from **TES dayside thermal inertia (Putzig et al. 2007)** (`tes_dayside_ti_putzig_2007.tif`); the API uses `thermalInertia` when present to choose **neural vs XGB** for the score (see fusion paragraph under **Landing Suitability Prediction**). **Water (observed)** is **Odyssey GRS** weight percent (`mars_odyssey_grs_mons_perc_wt.tif`, field `grsWaterWt`)—illustrative vs the neural water output; definitions may differ from training targets.
 
 ## 🚀 Quick Start
 
@@ -58,6 +58,10 @@ uv run python backend/app.py
 ```
 
 The API will start on `http://localhost:5002` (or port 5000 if 5002 is unavailable).
+
+Optional: for detailed server logs and per-request HTTP lines, run with `VANGUARD_VERBOSE=1` (default is a short, readable startup + one line per `/predict`).
+
+**Recommended way to use the globe + API together:** after `./start_api.sh` (or `uv run python backend/app.py`), open **`http://127.0.0.1:5002`** (or the port printed in the terminal—**5000** if 5002 is taken). Flask serves `frontend/3d_globe/` and `POST /predict` on the **same origin**, which matches the client’s `fetch` to `/predict`.
 
 ### Running without `uv` (pip)
 
@@ -116,25 +120,39 @@ uv run python backend/water_predictor.py
    uv run python backend/app.py
    ```
 
-### Frontend Setup
+### Frontend setup
 
-1. **Navigate to 3D globe directory**
-   ```bash
-   cd frontend/3d_globe
-   ```
+**Default (no extra steps):** the backend serves the globe; see **Running the API** above.
 
-2. **Install Node.js dependencies**
-   ```bash
-   npm install
-   ```
+**Optional — `live-server` only for frontend-only hacking:** the page calls **`/predict` on the same host as the page**. If you open the app on port **8080** without a proxy, `/predict` will not hit the Flask API unless you change the fetch URL or add a dev proxy. For a working predict button, prefer the **Flask URL**.
 
-3. **Start local server**
-   ```bash
-   npx live-server --port=8080
-   ```
+```bash
+cd frontend/3d_globe
+npm install
+npx live-server --port=8080   # optional; wire API separately if you need predictions
+```
 
-4. **Open in browser**
-   Navigate to `http://localhost:8080` to view the 3D Mars visualization.
+### Demo: GeoTIFF layers sampled on click
+
+These files (under `frontend/3d_globe/public/data/`) are registered in `frontend/3d_globe/index.js` and sampled at the clicked location:
+
+| Layer | File (repo) |
+|--------|-------------|
+| Elevation (MOLA) | `MOLA_128ppd_topo.tif` |
+| Slope | `mola_hrsc_blend_slope_v2.tif` |
+| Roughness | `mola_roughness_0.6km_numeric.tif` |
+| Albedo | `omega_albedo_r1080.tif` |
+| Temperature (yearly average °C) | `mars_yearly_avg_temperature_celsius.tif` |
+| Temperature range | `mars_yearly_temperature_range_v1.0.tif` |
+| Crustal thickness | `mars_crustal_thickness_gmm3_rm1.tif` |
+| Ferric / dust (OMEGA) | `omega_ferric_nnphs.tif` (also exposed as `dustObserved` in the API payload) |
+| Pyroxene | `omega_pyroxene_bd2000.tif` |
+| Basalt | `TES_Basalt_numeric.tif` |
+| Lambert albedo | `TES_Lambert_Albedo_numeric.tif` |
+| Thermal inertia (TES dayside, Putzig 2007) | `tes_dayside_ti_putzig_2007.tif` |
+| GRS water equivalent (% wt) | `mars_odyssey_grs_mons_perc_wt.tif` |
+
+GeoTIFF **no-data** values are respected when GDAL metadata is present so missing pixels are less likely to show as false `0.00`.
 
 ## Managing Dependencies with UV
 
@@ -207,7 +225,7 @@ The Flask API provides the following endpoints:
 
 ### Landing Suitability Prediction
 
-The main endpoint combines predictions from all models and calculates a landing suitability score:
+The main endpoint runs the neural property models, runs **XGBoost** for **surface temperature** and **thermal inertia** (when model files load), **fuses** temperature and thermal inertia for scoring (see fusion paragraph below), then computes **`landing_score`** via `LandingSuitabilityScorer`.
 
 **Request:**
 ```json
@@ -224,11 +242,22 @@ The main endpoint combines predictions from all models and calculates a landing 
   "ferric": 0.23,
   "pyroxene": 0.12,
   "basalt": 0.45,
-  "lambertAlbedo": 0.18
+  "lambertAlbedo": 0.18,
+  "thermalInertia": 412.0,
+  "grsWaterWt": 2.1,
+  "dustObserved": 0.23
 }
 ```
 
-**Response:**
+Optional / UI-driven fields: `thermalInertia` (TES dayside Putzig 2007 raster at the click) and `grsWaterWt` (Odyssey GRS % wt) are **passed through** for the **Observed** column and `raw_mars_data`; **`thermalInertia`** is also used in **TI fusion** for the landing score when present (see below). **`grsWaterWt`** is **not** an input feature to the neural nets in the current `map_mars_data_to_features` pipeline. **`dustObserved`** duplicates the **`ferric`** sample from `omega_ferric_nnphs.tif` for display only (not a separate model feature).
+
+**Response (illustrative numbers):**
+
+- `predictions.neural_networks` — **fused** property bundle **used for `landing_score`** (same key name as before; not “NN-only”).
+- `predictions.neural_networks_baseline` — **neural nets only** (no temperature/TI substitution from XGB).
+- `predictions.regression_models` — raw XGB outputs (`surface_temp_xgb`, `thermal_inertia_xgb`).
+- `raw_mars_data` — **echo of the full request JSON** the server received (not truncated in real responses).
+
 ```json
 {
   "success": true,
@@ -239,7 +268,14 @@ The main endpoint combines predictions from all models and calculates a landing 
       "dust": 0.15,
       "surface_temp": -42.3,
       "thermal_inertia": 450.2,
-      "water": 0.05
+      "water": 3.5
+    },
+    "neural_networks_baseline": {
+      "slope": 2.1,
+      "dust": 0.15,
+      "surface_temp": -41.0,
+      "thermal_inertia": 320.0,
+      "water": 3.5
     },
     "regression_models": {
       "surface_temp_xgb": -44.8,
@@ -253,10 +289,25 @@ The main endpoint combines predictions from all models and calculates a landing 
   "raw_mars_data": {
     "lat": 15.23,
     "lon": -45.67,
-    "elevation": 1234.56
+    "elevation": 1234.56,
+    "slope": 2.34,
+    "roughness": 0.89,
+    "albedo": 0.15,
+    "temperature": -45.23,
+    "tempRange": 12.45,
+    "crustalThickness": 45.67,
+    "ferric": 0.23,
+    "pyroxene": 0.12,
+    "basalt": 0.45,
+    "lambertAlbedo": 0.18,
+    "thermalInertia": 412.0,
+    "grsWaterWt": 2.1,
+    "dustObserved": 0.23
   }
 }
 ```
+
+**Fusion for the landing score:** `predictions.neural_networks` is the fused bundle used by `LandingSuitabilityScorer`. For **surface temperature**, if the request includes a numeric `temperature` (raster input from the globe), the API picks **neural vs XGB** whichever is closer to that value among physically plausible predictions; if `temperature` is missing, it keeps the previous rule (prefer XGB when its prediction is in \[-200, 50\] °C). For **thermal inertia**, the same “closest to observed” rule applies when the client sends numeric **`thermalInertia`** or **`thermal_inertia`** (the bundled globe now samples **Putzig 2007 TES dayside TI** into `thermalInertia`); if neither is sent, XGB is used when its value is in \[50, 2000\], else neural. `overrides_applied` values include `surface_temp_xgb` / `surface_temp_nn` and `thermal_inertia_xgb` / `thermal_inertia_nn` to indicate which source was chosen for the score (omitted when the default path uses neural-only for that field and no explicit choice is recorded).
 
 ### Landing Score Interpretation
 
@@ -287,7 +338,10 @@ response = requests.post('http://localhost:5002/predict', json={
     "ferric": 0.23,
     "pyroxene": 0.12,
     "basalt": 0.45,
-    "lambertAlbedo": 0.18
+    "lambertAlbedo": 0.18,
+    "thermalInertia": 412.0,
+    "grsWaterWt": 2.1,
+    "dustObserved": 0.23,
 })
 
 result = response.json()
@@ -295,11 +349,10 @@ print(f"Landing Score: {result['landing_score']}%")
 print(f"Predictions: {result['predictions']}")
 ```
 
-## Data Sources
+## Data sources
 
-- **JMARS**: Mars data visualization and analysis platform (https://jmars.asu.edu/)
-- **Mars datasets**: Elevation, albedo, slope, thermal inertia, and surface roughness data
-- **Natural Earth Data**: For 3D globe visualization (https://www.naturalearthdata.com/)
+- **JMARS and mission products** — Training data was extracted from [JMARS](https://jmars.asu.edu/); the demo uses bundled GeoTIFFs derived from NASA mission data products (files in `frontend/3d_globe/public/data/`; provenance per layer in the demo GeoTIFF table above).
+- **Globe texture** — Mars imagery for the 3D sphere (e.g. `frontend/3d_globe/textures/`); separate from the scientific rasters used for sampling and API inputs.
 
 ## Dependencies
 
@@ -336,6 +389,9 @@ This project is developed by:
 - **Eshaan Khare** - Project Lead, System Architecture, and ML Model Development (Slope, Surface Temperature, and Thermal Inertia models)
 - **Arv Jain** - Water and Dust Prediction Models
 
+## Deployment
+
+The stack is set up for **local or self-hosted** use: run the Flask app (`./start_api.sh` or `uv run python backend/app.py`), then open the URL it prints so the served globe and `POST /predict` share the same origin. There is no separate production deploy manifest in this repository; adapt hosting (WSGI, TLS, static assets) to your environment if you expose it beyond localhost.
 
 ## License
 

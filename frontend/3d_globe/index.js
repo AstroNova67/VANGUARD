@@ -67,15 +67,185 @@ document.getElementById("sunAngle").addEventListener("input", (e) => {
   sunRotationEnabled = false;
 });
 
+function formatPred(n, decimals = 2) {
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return "—";
+  return Number(n).toFixed(decimals);
+}
+
+function unitSuffix(unit) {
+  if (unit === "°C") return "°C";
+  if (unit === "%") return "%";
+  if (unit === "°") return "°";
+  return "";
+}
+
+/** @param {'slope'|'temp'|'ti'|'water'|'dust'|null} kind */
+function neuralDeltaHtml(observed, pred, kind) {
+  if (kind == null) return { wrapClass: "", deltaHtml: "" };
+  const o = observed != null && observed !== "" ? Number(observed) : NaN;
+  const p = pred != null && pred !== "" ? Number(pred) : NaN;
+  if (!Number.isFinite(o) || !Number.isFinite(p)) return { wrapClass: "", deltaHtml: "" };
+  const d = Math.abs(p - o);
+  let level = "warn";
+  if (kind === "slope") {
+    if (d < 0.5) level = "good";
+    else if (d < 2) level = "mid";
+  } else if (kind === "temp") {
+    if (d < 5) level = "good";
+    else if (d < 15) level = "mid";
+  } else if (kind === "ti") {
+    if (d < 40) level = "good";
+    else if (d < 120) level = "mid";
+  } else if (kind === "water") {
+    if (d < 1) level = "good";
+    else if (d < 4) level = "mid";
+  } else if (kind === "dust") {
+    if (d < 0.12) level = "good";
+    else if (d < 0.35) level = "mid";
+  }
+  return {
+    wrapClass: ` pred-value--delta-${level}`,
+    deltaHtml: ` <span class="pred-delta pred-delta--${level}" title="Neural vs raster at this pixel (illustrative)">Δ${formatPred(d)}</span>`,
+  };
+}
+
+/** Which model's output feeds `landing_score` for temp/TI; slope/dust/water always neural. */
+function rowScoreModel(row, overrides) {
+  const o = overrides || {};
+  if (row.nnKey === "slope" || row.nnKey === "dust" || row.nnKey === "water") return "nn";
+  if (row.nnKey === "surface_temp") {
+    const v = o.surface_temp;
+    if (v && String(v).includes("xgb")) return "xgb";
+    return "nn";
+  }
+  if (row.nnKey === "thermal_inertia") {
+    const v = o.thermal_inertia;
+    if (v && String(v).includes("xgb")) return "xgb";
+    return "nn";
+  }
+  return null;
+}
+
+function scorePinHtml(which) {
+  if (which === "nn") {
+    return ` <span class="pred-score-pin" title="This number is what the landing score uses for this row">Neural · in score</span>`;
+  }
+  if (which === "xgb") {
+    return ` <span class="pred-score-pin pred-score-pin--xgb" title="This number is what the landing score uses for this row">XGB · in score</span>`;
+  }
+  return "";
+}
+
+function buildPredRows(raw, nn, reg, overrides) {
+  const rows = [
+    {
+      label: "Slope",
+      unit: "°",
+      nnKey: "slope",
+      regKey: null,
+      obsKey: "slope",
+      deltaKind: "slope",
+    },
+    {
+      label: "Dust",
+      unit: "",
+      nnKey: "dust",
+      regKey: null,
+      obsKey: "dustObserved",
+      deltaKind: "dust",
+    },
+    {
+      label: "Surface temp",
+      unit: "°C",
+      nnKey: "surface_temp",
+      regKey: "surface_temp_xgb",
+      obsKey: "temperature",
+      deltaKind: "temp",
+    },
+    {
+      label: "Thermal inertia",
+      unit: "",
+      nnKey: "thermal_inertia",
+      regKey: "thermal_inertia_xgb",
+      obsKey: "thermalInertia",
+      deltaKind: "ti",
+    },
+    {
+      label: "Water",
+      unit: "%",
+      nnKey: "water",
+      regKey: null,
+      obsKey: "grsWaterWt",
+      deltaKind: "water",
+    },
+  ];
+
+  const obsCol = rows
+    .map((r) => {
+      let show = "—";
+      if (r.obsKey != null) {
+        const v = raw[r.obsKey];
+        show =
+          v !== null && v !== undefined && !Number.isNaN(Number(v))
+            ? `${formatPred(v)}${unitSuffix(r.unit)}`
+            : "—";
+      }
+      return `
+      <div class="pred-row">
+        <span class="pred-label">${r.label}${r.unit ? ` (${r.unit})` : ""}</span>
+        <span class="pred-value pred-value--obs">${show}</span>
+      </div>`;
+    })
+    .join("");
+
+  const nnCol = rows
+    .map((r) => {
+      const obsVal = r.obsKey != null ? raw[r.obsKey] : null;
+      const { wrapClass, deltaHtml } = neuralDeltaHtml(obsVal, nn[r.nnKey], r.deltaKind);
+      const val = `${formatPred(nn[r.nnKey])}${unitSuffix(r.unit)}`;
+      const pick = rowScoreModel(r, overrides);
+      const inScoreClass = pick === "nn" ? " pred-value--for-landing-score" : "";
+      const pin = pick === "nn" ? scorePinHtml("nn") : "";
+      return `
+      <div class="pred-row">
+        <span class="pred-label">${r.label}${r.unit ? ` (${r.unit})` : ""}</span>
+        <span class="pred-value pred-value--nn${inScoreClass}${wrapClass}">${val}${deltaHtml}${pin}</span>
+      </div>`;
+    })
+    .join("");
+
+  const regCol = rows
+    .map((r) => {
+      const v = r.regKey != null ? reg[r.regKey] : null;
+      const show =
+        r.regKey != null ? `${formatPred(v)}${unitSuffix(r.unit)}` : "—";
+      const pick = rowScoreModel(r, overrides);
+      const inScoreClass =
+        pick === "xgb" && r.regKey != null ? " pred-value--for-landing-score" : "";
+      const pin =
+        pick === "xgb" && r.regKey != null ? scorePinHtml("xgb") : "";
+      return `
+      <div class="pred-row">
+        <span class="pred-label">${r.label}${r.unit ? ` (${r.unit})` : ""}</span>
+        <span class="pred-value pred-value--xgb${inScoreClass}">${show}${pin}</span>
+      </div>`;
+    })
+    .join("");
+
+  return { obsCol, nnCol, regCol };
+}
+
 // Landing suitability prediction
 async function predictLandingSuitability() {
   if (!currentMarsData) {
-    alert("Please click on Mars first to get data");
+    document.getElementById("landingScore").innerHTML =
+      '<div class="pred-panel pred-panel--error" role="alert">Click the globe first to load raster values at a point, then run prediction.</div>';
     return;
   }
   
   try {
-    document.getElementById("landingScore").innerText = "🔄 Predicting landing suitability...";
+    document.getElementById("landingScore").innerHTML =
+      '<div class="pred-panel pred-panel--loading"><span class="pred-loading-spinner" aria-hidden="true"></span><span>Running prediction…</span></div>';
     document.getElementById("predictLanding").disabled = true;
     
     // Use relative URL so it works on both localhost and Render
@@ -105,64 +275,122 @@ async function predictLandingSuitability() {
     
     if (result.success) {
       const score = result.landing_score;
-      let scoreColor = '#4CAF50'; // Green
-      let scoreText = 'Excellent';
-      
+      let scoreBand = "high";
+      let scoreText = "Good";
       if (score < 30) {
-        scoreColor = '#f44336'; // Red
-        scoreText = 'Poor';
-      } else if (score < 50) {
-        scoreColor = '#ff9800'; // Orange
-        scoreText = 'Fair';
-      } else if (score < 70) {
-        scoreColor = '#ffeb3b'; // Yellow
-        scoreText = 'Good';
+        scoreBand = "low";
+        scoreText = "Poor";
+      } else if (score <= 50) {
+        scoreBand = "mid";
+        scoreText = "Fair";
+      } else if (score >= 70) {
+        scoreText = "Excellent";
       }
       
-      const nn = result.predictions?.neural_networks || {};
+      const fused = result.predictions?.neural_networks || {};
+      const nnOnly =
+        result.predictions?.neural_networks_baseline || fused;
       const reg = result.predictions?.regression_models || {};
       const overrides = result.overrides_applied || {};
       const raw = result.raw_mars_data || {};
-      const overrideNote = (key) => (overrides[key] ? ` <span style="opacity:0.8">(overridden by ${overrides[key]})</span>` : '');
-      const rawSummary = Object.keys(raw).length
-        ? Object.entries(raw)
-            .map(([k, v]) => `• ${k}: ${typeof v === 'number' ? v.toFixed(4) : v}`)
-            .join('<br>')
-        : 'N/A';
+      const { obsCol, nnCol, regCol } = buildPredRows(raw, nnOnly, reg, overrides);
+
+      const overrideParts = [];
+      const st = overrides.surface_temp;
+      const ti = overrides.thermal_inertia;
+      if (st === "surface_temp_xgb") {
+        overrideParts.push("surface temperature: XGBoost (used in landing score)");
+      } else if (st === "surface_temp_nn") {
+        overrideParts.push(
+          "surface temperature: neural nets (used in landing score—closer to raster temperature than XGB, or XGB out of range)"
+        );
+      }
+      if (ti === "thermal_inertia_xgb") {
+        overrideParts.push("thermal inertia: XGBoost (used in landing score)");
+      } else if (ti === "thermal_inertia_nn") {
+        overrideParts.push(
+          "thermal inertia: neural nets (used in landing score—closer to observed TI than XGB, or XGB out of range)"
+        );
+      }
+      const foot =
+        overrideParts.length > 0
+          ? `Score blends models for temperature and thermal inertia: ${overrideParts.join("; ")}. Slope, dust, and water in the score come from the neural nets.`
+          : "Score uses neural outputs for temperature and thermal inertia (XGB was not used for those this time, or regression was unavailable).";
+
+      const footRaster =
+        "Observed column = values from your GeoTIFFs (same as the JSON below). Dust uses the OMEGA ferric/dust raster. Slope / temp / TI / water use their listed products; neural targets are not identical, so treat Δ as a rough guide. Zeros on pyroxene or basalt may be real or no-data.";
+
+      const rawJson =
+        Object.keys(raw).length > 0
+          ? JSON.stringify(raw, null, 2)
+          : "{}";
+      const rawSafe = rawJson
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
       document.getElementById("landingScore").innerHTML = `
-        <div style="color: ${scoreColor}; font-size: 18px;">
-          🚀 Landing Suitability: ${score}% (${scoreText})
-        </div>
-        <div style="font-size: 12px; margin-top: 5px;">
-          Predicted Surface Properties:<br>
-          • Slope: ${nn.slope?.toFixed(2) || 'N/A'}${overrideNote('slope')}<br>
-          • Dust: ${nn.dust?.toFixed(2) || 'N/A'}${overrideNote('dust')}<br>
-          • Surface Temp: ${nn.surface_temp?.toFixed(2) || 'N/A'}°C${overrideNote('surface_temp')}<br>
-          • Thermal Inertia: ${nn.thermal_inertia?.toFixed(2) || 'N/A'}${overrideNote('thermal_inertia')}<br>
-          • Water: ${nn.water?.toFixed(2) || 'N/A'}${overrideNote('water')}
-          <div style="margin-top: 6px; opacity: 0.9;">
-            Regression model outputs (debug):<br>
-            • Surface Temp (XGB): ${reg.surface_temp_xgb?.toFixed(2) || 'N/A'}°C<br>
-            • Thermal Inertia (XGB): ${reg.thermal_inertia_xgb?.toFixed(2) || 'N/A'}
+        <div class="pred-panel pred-panel--score-${scoreBand}">
+          <div class="pred-score-card">
+            <div class="pred-score">Landing suitability: ${score}% <span class="pred-score-note">(${scoreText})</span></div>
+            <p class="pred-lead">Each row: rasters vs neural vs XGB. <strong>Neural · in score</strong> / <strong>XGB · in score</strong> marks which value the landing % actually uses for that property (temp &amp; TI can be either; slope, dust, water always neural). Δ colors on neural = rough gap vs raster.</p>
           </div>
-          <details style="margin-top: 8px;">
-            <summary style="cursor: pointer;">Raw Mars input (what was sent)</summary>
-            <div style="margin-top: 6px; opacity: 0.9;">
-              ${rawSummary}
+          <div class="pred-legend" role="note" aria-label="Column legend">
+            <span><span class="pred-legend-dot pred-legend-dot--obs" aria-hidden="true"></span> Raster sample</span>
+            <span><span class="pred-legend-dot pred-legend-dot--nn" aria-hidden="true"></span> Neural</span>
+            <span><span class="pred-legend-dot pred-legend-dot--xgb" aria-hidden="true"></span> XGBoost</span>
+            <span><span class="pred-legend-dot pred-legend-dot--score" aria-hidden="true"></span> Amber box + tag = in landing score</span>
+          </div>
+          <div class="pred-grid-scroll">
+            <div class="pred-grid">
+              <div class="pred-col pred-col--obs">
+                <div class="pred-col-title pred-col-title--obs">
+                  <span class="pred-col-title-short">Raster</span>
+                  <span class="pred-col-title-long">Observed (raster)</span>
+                </div>
+                ${obsCol}
+              </div>
+              <div class="pred-col pred-col--nn">
+                <div class="pred-col-title pred-col-title--nn">
+                  <span class="pred-col-title-short">Neural</span>
+                  <span class="pred-col-title-long">Neural networks</span>
+                </div>
+                ${nnCol}
+              </div>
+              <div class="pred-col pred-col--xgb">
+                <div class="pred-col-title pred-col-title--xgb">
+                  <span class="pred-col-title-short">XGB</span>
+                  <span class="pred-col-title-long">Regression (XGB)</span>
+                </div>
+                ${regCol}
+              </div>
+            </div>
+          </div>
+          <details class="pred-details">
+            <summary>Scoring &amp; data notes</summary>
+            <div class="pred-details-body">
+              <p class="pred-footnote">${foot}</p>
+              <p class="pred-footnote pred-footnote--raster">${footRaster}</p>
             </div>
           </details>
+          <div class="pred-raw">
+            <details>
+              <summary>View request JSON (sent to the server)</summary>
+              <pre>${rawSafe}</pre>
+              <p class="pred-raw-hint">Scroll inside the box if the payload is long. This is exactly what <code>/predict</code> received.</p>
+            </details>
+          </div>
         </div>
       `;
       
       console.log("Prediction result:", result);
     } else {
-      document.getElementById("landingScore").innerText = `❌ Error: ${result.error}`;
+      document.getElementById("landingScore").innerHTML = `<div class="pred-panel pred-panel--error">${result.error || "Request failed"}</div>`;
     }
     
   } catch (error) {
     console.error("API call failed:", error);
-    document.getElementById("landingScore").innerText = `❌ Failed to connect to API: ${error.message}`;
+    document.getElementById("landingScore").innerHTML = `<div class="pred-panel pred-panel--error">Could not reach API: ${error.message}</div>`;
   } finally {
     document.getElementById("predictLanding").disabled = false;
   }
@@ -205,68 +433,94 @@ const marsDatasets = {
     name: "Elevation (MOLA)",
     file: "./public/data/MOLA_128ppd_topo.tif",
     unit: "m",
-    description: "Mars Orbiter Laser Altimeter elevation data"
+    description: "Mars Orbiter Laser Altimeter elevation data",
+    marsDataKey: "elevation",
   },
   slope: {
     name: "Slope",
     file: "./public/data/mola_hrsc_blend_slope_v2.tif",
     unit: "°",
-    description: "Surface slope measurements"
+    description: "Surface slope measurements",
+    marsDataKey: "slope",
   },
   roughness: {
     name: "Roughness",
     file: "./public/data/mola_roughness_0.6km_numeric.tif",
     unit: "m",
-    description: "Surface roughness at 0.6km scale"
+    description: "Surface roughness at 0.6km scale",
+    marsDataKey: "roughness",
   },
   albedo: {
     name: "Albedo",
     file: "./public/data/omega_albedo_r1080.tif",
     unit: "",
-    description: "Surface albedo (reflectivity)"
+    description: "Surface albedo (reflectivity)",
+    marsDataKey: "albedo",
   },
   temperature: {
     name: "Temperature",
     file: "./public/data/mars_yearly_avg_temperature_celsius.tif",
     unit: "°C",
-    description: "Yearly average surface temperature"
+    description: "Yearly average surface temperature",
+    marsDataKey: "temperature",
   },
   tempRange: {
     name: "Temperature Range",
     file: "./public/data/mars_yearly_temperature_range_v1.0.tif",
     unit: "°C",
-    description: "Yearly temperature variation"
+    description: "Yearly temperature variation",
+    marsDataKey: "tempRange",
   },
   crustalThickness: {
     name: "Crustal Thickness",
     file: "./public/data/mars_crustal_thickness_gmm3_rm1.tif",
     unit: "km",
-    description: "Mars crustal thickness"
+    description: "Mars crustal thickness",
+    marsDataKey: "crustalThickness",
   },
   ferric: {
-    name: "Ferric Content",
+    name: "Ferric / dust (OMEGA)",
     file: "./public/data/omega_ferric_nnphs.tif",
     unit: "",
-    description: "Ferric iron content"
+    description:
+      "OMEGA ferric/dust-related index (same raster is copied to dustObserved for the Observed column)",
+    marsDataKey: "ferric",
   },
   pyroxene: {
     name: "Pyroxene",
     file: "./public/data/omega_pyroxene_bd2000.tif",
     unit: "",
-    description: "Pyroxene mineral content"
+    description: "Pyroxene mineral content",
+    marsDataKey: "pyroxene",
   },
   basalt: {
     name: "Basalt",
     file: "./public/data/TES_Basalt_numeric.tif",
     unit: "",
-    description: "Basalt abundance"
+    description: "Basalt abundance",
+    marsDataKey: "basalt",
   },
   lambertAlbedo: {
     name: "Lambert Albedo",
     file: "./public/data/TES_Lambert_Albedo_numeric.tif",
     unit: "",
-    description: "Lambert albedo from TES"
-  }
+    description: "Lambert albedo from TES",
+    marsDataKey: "lambertAlbedo",
+  },
+  thermalInertiaObs: {
+    name: "Thermal inertia (TES dayside, Putzig 2007)",
+    file: "./public/data/tes_dayside_ti_putzig_2007.tif",
+    unit: "TIU",
+    description: "TES dayside thermal inertia (Putzig et al. 2007); SI-style inertia units",
+    marsDataKey: "thermalInertia",
+  },
+  grsWaterWt: {
+    name: "GRS water equivalent (% wt)",
+    file: "./public/data/mars_odyssey_grs_mons_perc_wt.tif",
+    unit: "%",
+    description: "Mars Odyssey GRS hydrogen / water-equivalent weight percent (MONS product)",
+    marsDataKey: "grsWaterWt",
+  },
 };
 
 let currentDataset = null;
@@ -287,8 +541,21 @@ async function loadGeoTIFF(url) {
     const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
     const image = await tiff.getImage();
     const data = await image.readRasters({ interleave: true });
-    
-    
+
+    let nodata = null;
+    try {
+      if (typeof image.getGDALNoData === "function") {
+        const nd = image.getGDALNoData();
+        if (nd != null && nd !== "" && !Number.isNaN(Number(nd))) nodata = Number(nd);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    if (nodata == null && image.fileDirectory?.GDAL_NODATA != null) {
+      const s = String(image.fileDirectory.GDAL_NODATA).trim();
+      if (s !== "" && !Number.isNaN(Number(s))) nodata = Number(s);
+    }
+
     // Handle cases where getBoundingBox() might fail due to missing affine transformation
     let bounds;
     try {
@@ -297,12 +564,13 @@ async function loadGeoTIFF(url) {
       // Silently use default bounds for Mars (assuming equirectangular projection)
       bounds = [-180, -90, 180, 90];
     }
-    
-    return { 
-      width: image.getWidth(), 
-      height: image.getHeight(), 
-      data, 
-      bounds 
+
+    return {
+      width: image.getWidth(),
+      height: image.getHeight(),
+      data,
+      bounds,
+      nodata,
     };
   } catch (error) {
     console.error("Error loading GeoTIFF:", error);
@@ -312,7 +580,8 @@ async function loadGeoTIFF(url) {
       width: 1024,
       height: 512,
       data: new Array(1024 * 512).fill(0).map(() => Math.random() * 1000 - 500),
-      bounds: [-180, -90, 180, 90]
+      bounds: [-180, -90, 180, 90],
+      nodata: null,
     };
   }
 }
@@ -354,7 +623,10 @@ async function switchDataset(datasetType) {
   } catch (error) {
     console.error("Failed to load Mars dataset:", error);
     // Show user-friendly error message
-    document.getElementById("coords").innerText = "Error loading elevation data";
+    const ce = document.getElementById("coords");
+    ce.classList.remove("coords--empty");
+    ce.innerText =
+      "Could not load starting elevation layer. Check the browser console, confirm GeoTIFF paths, and refresh.";
   }
 })();
 
@@ -365,43 +637,42 @@ function latLonToPixel(lat, lon, width, height) {
   return { x, y };
 }
 
-function getValueAt(lat, lon) {
-  if (!currentDataset) return null;
-  const { width, height, data } = currentDataset;
+function isNoDataSample(raw, nodata) {
+  if (raw == null) return true;
+  if (typeof raw === "number" && Number.isNaN(raw)) return true;
+  if (nodata == null || !Number.isFinite(Number(nodata))) return false;
+  const nd = Number(nodata);
+  const v = Number(raw);
+  if (!Number.isFinite(v)) return true;
+  const tol = 1e-6 * Math.max(1, Math.abs(nd));
+  return v === nd || Math.abs(v - nd) <= tol;
+}
+
+/** Sample a loaded raster at lat/lon; returns null for out of bounds or GDAL no-data. */
+function sampleDatasetAt(dataset, lat, lon) {
+  if (!dataset) return null;
+  const { width, height, data, nodata } = dataset;
   const { x, y } = latLonToPixel(lat, lon, width, height);
-  
-  // Check bounds to prevent array index errors
-  if (x < 0 || x >= width || y < 0 || y >= height) {
-    return null;
-  }
-  
+
+  if (x < 0 || x >= width || y < 0 || y >= height) return null;
+
   const index = y * width + x;
-  if (index >= data.length) {
-    return null;
-  }
-  
-  return data[index];
+  if (index >= data.length) return null;
+
+  const raw = data[index];
+  if (isNoDataSample(raw, nodata)) return null;
+  const v = Number(raw);
+  return Number.isFinite(v) ? v : null;
+}
+
+function getValueAt(lat, lon) {
+  return sampleDatasetAt(currentDataset, lat, lon);
 }
 
 // Get value from a specific dataset at given coordinates
 function getValueFromDataset(datasetType, lat, lon) {
   const dataset = loadedDatasets.get(datasetType);
-  if (!dataset) return null;
-  
-  const { width, height, data } = dataset;
-  const { x, y } = latLonToPixel(lat, lon, width, height);
-  
-  // Check bounds to prevent array index errors
-  if (x < 0 || x >= width || y < 0 || y >= height) {
-    return null;
-  }
-  
-  const index = y * width + x;
-  if (index >= data.length) {
-    return null;
-  }
-  
-  return data[index];
+  return sampleDatasetAt(dataset, lat, lon);
 }
 
 // --- Mouse Click Handler ---
@@ -419,7 +690,9 @@ async function onMouseClick(event) {
     const lat = Math.asin(point.y / radius) * (180 / Math.PI);
 
     // Show loading message
-    document.getElementById("coords").innerText = `Loading all datasets for Lat: ${lat.toFixed(2)}°, Lon: ${lon.toFixed(2)}°...`;
+    const coordsEl = document.getElementById("coords");
+    coordsEl.classList.remove("coords--empty");
+    coordsEl.innerText = `Loading layers…\nLat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°`;
 
     // Load all datasets and get values
     const allValues = [];
@@ -435,7 +708,8 @@ async function onMouseClick(event) {
           name: datasetInfo.name,
           value: value,
           unit: datasetInfo.unit,
-          description: datasetInfo.description
+          description: datasetInfo.description,
+          marsDataKey: datasetInfo.marsDataKey,
         });
       } catch (error) {
         console.warn(`Failed to load ${datasetInfo.name}:`, error);
@@ -443,53 +717,39 @@ async function onMouseClick(event) {
           name: datasetInfo.name,
           value: null,
           unit: datasetInfo.unit,
-          description: datasetInfo.description
+          description: datasetInfo.description,
+          marsDataKey: datasetInfo.marsDataKey,
         });
       }
     }
 
-    // Format all values into a list and store data for API
+    // Format all values into a list and store data for API (keys from marsDataKey on each layer)
     let valuesList = `Lat: ${lat.toFixed(2)}°, Lon: ${lon.toFixed(2)}°\n\n`;
-    currentMarsData = {
-      lat: lat,
-      lon: lon,
-      elevation: null,
-      slope: null,
-      roughness: null,
-      albedo: null,
-      temperature: null,
-      tempRange: null,
-      crustalThickness: null,
-      ferric: null,
-      pyroxene: null,
-      basalt: null,
-      lambertAlbedo: null
-    };
-    
-    allValues.forEach(item => {
-      const valueStr = item.value !== null ? `${item.value.toFixed(2)} ${item.unit}` : "N/A";
+    currentMarsData = { lat, lon };
+    for (const d of Object.values(marsDatasets)) {
+      if (d.marsDataKey) currentMarsData[d.marsDataKey] = null;
+    }
+
+    allValues.forEach((item) => {
+      const valueStr =
+        item.value !== null && item.value !== undefined && !Number.isNaN(Number(item.value))
+          ? `${Number(item.value).toFixed(2)} ${item.unit}`
+          : "N/A";
       valuesList += `• ${item.name}: ${valueStr}\n`;
-      
-      // Store data for API call
-      const key = item.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (key.includes('elevation')) currentMarsData.elevation = item.value;
-      else if (key.includes('slope')) currentMarsData.slope = item.value;
-      else if (key.includes('roughness')) currentMarsData.roughness = item.value;
-      else if (key.includes('albedo') && !key.includes('lambert')) currentMarsData.albedo = item.value;
-      else if (key.includes('temperature') && !key.includes('range')) currentMarsData.temperature = item.value;
-      else if (key.includes('temperaturerange')) currentMarsData.tempRange = item.value;
-      else if (key.includes('crustalthickness')) currentMarsData.crustalThickness = item.value;
-      else if (key.includes('ferric')) currentMarsData.ferric = item.value;
-      else if (key.includes('pyroxene')) currentMarsData.pyroxene = item.value;
-      else if (key.includes('basalt')) currentMarsData.basalt = item.value;
-      else if (key.includes('lambertalbedo')) currentMarsData.lambertAlbedo = item.value;
+      if (item.marsDataKey) {
+        currentMarsData[item.marsDataKey] = item.value;
+      }
     });
 
+    currentMarsData.dustObserved = currentMarsData.ferric;
+
     // Update UI
-    document.getElementById("coords").innerText = valuesList;
-    
+    coordsEl.innerText = valuesList;
+
     // Show prediction button
     document.getElementById("predictLanding").style.display = "block";
+    const hint = document.getElementById("predictHint");
+    if (hint) hint.style.display = "block";
     document.getElementById("landingScore").innerText = "";
 
     // Show marker
