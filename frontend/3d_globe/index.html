@@ -31,13 +31,14 @@
         position: absolute;
         top: 12px;
         left: 12px;
-        max-width: min(580px, calc(100vw - 24px));
+        /* Readable sidebar without hiding the globe; horizontal scroll when the prediction table needs it. */
+        width: min(420px, calc(100vw - 24px));
+        max-width: min(460px, 46vw);
         max-height: calc(100vh - 24px);
         overflow-y: auto;
-        overflow-x: hidden;
-        width: 100%;
+        overflow-x: auto;
         background: rgba(6, 14, 26, 0.94);
-        padding: 16px 18px 18px;
+        padding: 14px 14px 16px;
         border-radius: 14px;
         border: 1px solid rgba(120, 175, 220, 0.35);
         box-shadow:
@@ -360,8 +361,9 @@
 
       .pred-grid-scroll {
         overflow-x: auto;
-        margin: 0 -4px;
-        padding-bottom: 6px;
+        overflow-y: visible;
+        margin: 0 -6px;
+        padding: 0 6px 8px;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
         scrollbar-color: rgba(140, 170, 200, 0.35) transparent;
@@ -412,42 +414,43 @@
 
       .pred-grid {
         display: grid;
-        grid-template-columns: minmax(108px, 1fr) minmax(108px, 1fr) minmax(108px, 1fr);
+        /* Wide enough for labels + values + Δ; parent scrolls horizontally on narrow panels */
+        grid-template-columns: minmax(158px, 1fr) minmax(168px, 1fr) minmax(168px, 1fr);
         gap: 8px 0;
-        column-gap: 12px;
+        column-gap: 14px;
         align-items: start;
-        min-width: min(100%, 340px);
+        min-width: 520px;
       }
 
       .pred-col {
         min-width: 0;
-        padding: 0 4px;
+        padding: 0 2px;
       }
 
       .pred-col--obs {
         border-right: 1px solid rgba(120, 200, 160, 0.22);
-        padding-right: 10px;
-        margin-right: 2px;
+        padding-right: 8px;
+        margin-right: 0;
       }
 
       .pred-col--nn {
         border-right: 1px solid rgba(120, 180, 220, 0.22);
-        padding-right: 10px;
-        margin-right: 2px;
+        padding-right: 8px;
+        margin-right: 0;
       }
 
       .pred-col--xgb {
-        padding-left: 2px;
+        padding-left: 0;
       }
 
       .pred-col-title {
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.06em;
         line-height: 1.35;
         margin-bottom: 8px;
-        padding: 8px 8px;
+        padding: 8px 6px;
         border-radius: 8px;
         border-bottom: 2px solid transparent;
       }
@@ -491,11 +494,12 @@
       }
 
       .pred-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 8px;
-        padding: 6px 4px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, max-content);
+        align-items: start;
+        column-gap: 8px;
+        row-gap: 2px;
+        padding: 8px 2px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         font-variant-numeric: tabular-nums;
       }
@@ -510,18 +514,24 @@
 
       .pred-label {
         color: #95b0c4;
-        flex-shrink: 1;
-        font-size: 11.5px;
-        line-height: 1.35;
+        font-size: 11px;
+        line-height: 1.4;
         min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        hyphens: manual;
       }
 
       .pred-value {
         color: #f0f6fb;
         text-align: right;
-        word-break: break-word;
-        font-size: 12.5px;
+        justify-self: end;
+        max-width: 100%;
+        word-break: normal;
+        overflow-wrap: break-word;
+        font-size: 12px;
         font-weight: 600;
+        line-height: 1.35;
       }
 
       .pred-value--obs {
@@ -537,7 +547,7 @@
         box-shadow: 0 0 0 1px rgba(255, 190, 120, 0.55);
         border-radius: 8px;
         padding: 4px 6px 5px;
-        margin: -2px -4px;
+        margin: 0;
         display: inline-block;
         max-width: 100%;
         vertical-align: top;
@@ -546,8 +556,8 @@
 
       .pred-score-pin {
         display: block;
-        margin-top: 5px;
-        font-size: 8.5px;
+        margin-top: 4px;
+        font-size: 8px;
         font-weight: 800;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -574,6 +584,27 @@
       }
 
       .pred-value--nn.pred-value--delta-warn {
+        box-shadow: inset 3px 0 0 rgba(229, 115, 115, 0.85);
+        padding-left: 6px;
+        margin-left: -6px;
+        border-radius: 4px;
+      }
+
+      .pred-value--xgb.pred-value--delta-good {
+        box-shadow: inset 3px 0 0 rgba(129, 199, 132, 0.75);
+        padding-left: 6px;
+        margin-left: -6px;
+        border-radius: 4px;
+      }
+
+      .pred-value--xgb.pred-value--delta-mid {
+        box-shadow: inset 3px 0 0 rgba(255, 204, 102, 0.8);
+        padding-left: 6px;
+        margin-left: -6px;
+        border-radius: 4px;
+      }
+
+      .pred-value--xgb.pred-value--delta-warn {
         box-shadow: inset 3px 0 0 rgba(229, 115, 115, 0.85);
         padding-left: 6px;
         margin-left: -6px;

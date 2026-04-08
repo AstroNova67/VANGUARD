@@ -80,7 +80,7 @@ function unitSuffix(unit) {
 }
 
 /** @param {'slope'|'temp'|'ti'|'water'|'dust'|null} kind */
-function neuralDeltaHtml(observed, pred, kind) {
+function observedDeltaHtml(observed, pred, kind) {
   if (kind == null) return { wrapClass: "", deltaHtml: "" };
   const o = observed != null && observed !== "" ? Number(observed) : NaN;
   const p = pred != null && pred !== "" ? Number(pred) : NaN;
@@ -105,7 +105,7 @@ function neuralDeltaHtml(observed, pred, kind) {
   }
   return {
     wrapClass: ` pred-value--delta-${level}`,
-    deltaHtml: ` <span class="pred-delta pred-delta--${level}" title="Neural vs raster at this pixel (illustrative)">Δ${formatPred(d)}</span>`,
+    deltaHtml: ` <span class="pred-delta pred-delta--${level}" title="|model − raster| at this pixel (illustrative)">Δ${formatPred(d)}</span>`,
   };
 }
 
@@ -201,7 +201,7 @@ function buildPredRows(raw, nn, reg, overrides) {
   const nnCol = rows
     .map((r) => {
       const obsVal = r.obsKey != null ? raw[r.obsKey] : null;
-      const { wrapClass, deltaHtml } = neuralDeltaHtml(obsVal, nn[r.nnKey], r.deltaKind);
+      const { wrapClass, deltaHtml } = observedDeltaHtml(obsVal, nn[r.nnKey], r.deltaKind);
       const val = `${formatPred(nn[r.nnKey])}${unitSuffix(r.unit)}`;
       const pick = rowScoreModel(r, overrides);
       const inScoreClass = pick === "nn" ? " pred-value--for-landing-score" : "";
@@ -219,6 +219,11 @@ function buildPredRows(raw, nn, reg, overrides) {
       const v = r.regKey != null ? reg[r.regKey] : null;
       const show =
         r.regKey != null ? `${formatPred(v)}${unitSuffix(r.unit)}` : "—";
+      const obsVal = r.obsKey != null ? raw[r.obsKey] : null;
+      const { wrapClass, deltaHtml } =
+        r.regKey != null && r.deltaKind != null
+          ? observedDeltaHtml(obsVal, v, r.deltaKind)
+          : { wrapClass: "", deltaHtml: "" };
       const pick = rowScoreModel(r, overrides);
       const inScoreClass =
         pick === "xgb" && r.regKey != null ? " pred-value--for-landing-score" : "";
@@ -227,7 +232,7 @@ function buildPredRows(raw, nn, reg, overrides) {
       return `
       <div class="pred-row">
         <span class="pred-label">${r.label}${r.unit ? ` (${r.unit})` : ""}</span>
-        <span class="pred-value pred-value--xgb${inScoreClass}">${show}${pin}</span>
+        <span class="pred-value pred-value--xgb${inScoreClass}${wrapClass}">${show}${deltaHtml}${pin}</span>
       </div>`;
     })
     .join("");
@@ -318,7 +323,7 @@ async function predictLandingSuitability() {
           : "Score uses neural outputs for temperature and thermal inertia (XGB was not used for those this time, or regression was unavailable).";
 
       const footRaster =
-        "Observed column = values from your GeoTIFFs (same as the JSON below). Dust uses the OMEGA ferric/dust raster. Slope / temp / TI / water use their listed products; neural targets are not identical, so treat Δ as a rough guide. Zeros on pyroxene or basalt may be real or no-data.";
+        "Observed column = values from your GeoTIFFs (same as the JSON below). Dust uses the OMEGA ferric/dust raster. Slope / temp / TI / water use their listed products; neural targets are not identical, so treat Δ as a rough guide (same for XGB vs raster on surface temp and thermal inertia). Zeros on pyroxene or basalt may be real or no-data.";
 
       const rawJson =
         Object.keys(raw).length > 0
@@ -333,7 +338,7 @@ async function predictLandingSuitability() {
         <div class="pred-panel pred-panel--score-${scoreBand}">
           <div class="pred-score-card">
             <div class="pred-score">Landing suitability: ${score}% <span class="pred-score-note">(${scoreText})</span></div>
-            <p class="pred-lead">Each row: rasters vs neural vs XGB. <strong>Neural · in score</strong> / <strong>XGB · in score</strong> marks which value the landing % actually uses for that property (temp &amp; TI can be either; slope, dust, water always neural). Δ colors on neural = rough gap vs raster.</p>
+            <p class="pred-lead">Each row: rasters vs neural vs XGB. <strong>Neural · in score</strong> / <strong>XGB · in score</strong> marks which value the landing % actually uses for that property (temp &amp; TI can be either; slope, dust, water always neural). <strong>Δ</strong> = |model − raster| (green / amber / red); shown for neural and for XGB where regression exists.</p>
           </div>
           <div class="pred-legend" role="note" aria-label="Column legend">
             <span><span class="pred-legend-dot pred-legend-dot--obs" aria-hidden="true"></span> Raster sample</span>

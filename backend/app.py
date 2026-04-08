@@ -22,6 +22,9 @@ import numpy as np
 import tensorflow as tf
 import keras
 
+# Suppress noisy Python-side TF warnings (e.g. tf.function retracing on repeated predict shapes).
+tf.get_logger().setLevel(logging.ERROR)
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 def _verbose() -> bool:
     return os.environ.get("VANGUARD_VERBOSE", "").strip().lower() in ("1", "true", "yes")

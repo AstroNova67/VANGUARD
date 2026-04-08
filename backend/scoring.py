@@ -1,9 +1,12 @@
+import logging
 import numpy as np
 import pickle
 import os
 from sklearn.preprocessing import RobustScaler, QuantileTransformer
 import tensorflow as tf
 
+tf.get_logger().setLevel(logging.ERROR)
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 # Global variable to store loaded scalers
 scalers = {}
