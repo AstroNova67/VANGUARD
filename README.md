@@ -7,7 +7,18 @@
 
 Our goal is to leverage Martian geospatial data to build machine learning models that predict key surface and environmental attributes of Mars. These models aim to support the identification of interesting landing-site candidates for future missions, based on scientific and engineering-style criteria.
 
-The **3D globe** loads **bundled GeoTIFFs** under `frontend/3d_globe/public/data/`, samples them at the clicked lat/lon, and sends those values to `POST /predict`. **Live UI path:** **GeoTIFF → JSON features → neural nets + XGB (where available) → fused properties → landing score** (`backend/scoring.py`).
+The **3D globe** loads **bundled GeoTIFFs** under `frontend/3d_globe/public/data/`, samples them at the clicked lat/lon, and sends those values to `POST /predict`.
+
+**Live pipeline**
+
+| Stage | Where | What happens |
+|--------|--------|----------------|
+| **Client** | `frontend/3d_globe/index.js` | Click → lat/lon → each registered GeoTIFF is sampled at that point → JSON body (`elevation`, `slope`, `temperature`, `thermalInertia`, `ferric`, …). |
+| **Inference inputs** | `backend/scoring.py` → `map_mars_data_to_features` | Turns that JSON into scaled feature vectors per model (same file also runs inverse transforms on raw NN outputs). |
+| **Models** | `backend/app.py` | Loads saved Keras + XGB checkpoints from `saved_models/`; runs predictions; **fuses** surface temp / thermal inertia for scoring (`_fuse_*_for_score` in `app.py`). |
+| **Landing %** | `backend/scoring.py` → `LandingSuitabilityScorer` | Combines the five fused predictions with fixed weights (see `LANDING_SCORING_SOURCES.md`). |
+
+**Trained ML weights:** Checkpoints under `saved_models/` come from the `backend/*_predictor.py` training scripts and are unchanged by the landing-score rubric. The only issue that was fixed was **live inference mapping** in `map_mars_data_to_features` (`scoring.py`): the surface-temperature NN/XGB must receive **dayside thermal inertia** in input slot 3, filled from **`thermalInertia`** in the JSON—matching training. **Fusion** (which NN vs XGB value to use) still lives in **`backend/app.py`**. No model retrain was required for that fix.
 
 ## Objectives
 
@@ -249,7 +260,11 @@ The main endpoint runs the neural property models, runs **XGBoost** for **surfac
 }
 ```
 
-Optional / UI-driven fields: `thermalInertia` (TES dayside Putzig 2007 raster at the click) and `grsWaterWt` (Odyssey GRS % wt) are **passed through** for the **Observed** column and `raw_mars_data`; **`thermalInertia`** is also used in **TI fusion** for the landing score when present (see below). **`grsWaterWt`** is **not** an input feature to the neural nets in the current `map_mars_data_to_features` pipeline. **`dustObserved`** duplicates the **`ferric`** sample from `omega_ferric_nnphs.tif` for display only (not a separate model feature).
+Optional / UI-driven fields: `thermalInertia` (TES dayside Putzig 2007 raster at the click) and `grsWaterWt` (Odyssey GRS % wt) are **passed through** for the **Observed** column and `raw_mars_data`. **Landing score** uses **both** predicted surface temperature **and** predicted thermal inertia as separate weighted terms (20% each in `LandingSuitabilityScorer`).
+
+For **surface-temperature** NN/XGB, the five **inputs** are built in `map_mars_data_to_features` (`scoring.py`). The **third** column matches training (**dayside thermal inertia**), so the JSON field **`thermalInertia`** fills that slot. The **`temperature`** field (yearly average °C from its GeoTIFF) is **not** that third input; it is still used for **fusion** in `app.py` (closest to observed °C) and as an input to other heads where the feature map uses `temperature`. **`thermalInertia`** is also used for **TI fusion** when present. **`grsWaterWt`** is **not** an input to the neural nets in `map_mars_data_to_features`. **`dustObserved`** duplicates **`ferric`** for display only.
+
+**API-only callers:** Include **`thermalInertia`** in the POST body whenever possible so the surface-temperature models receive the same third input as training (the globe does this automatically). If it is omitted, inference uses a default for that slot—prefer always sending TI for serious use.
 
 **Response (illustrative numbers):**
 

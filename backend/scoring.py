@@ -142,6 +142,15 @@ def map_mars_data_to_features(mars_data, model_name):
     elevation = mars_data.get('elevation', 1000.0)
     temp_range = mars_data.get('tempRange', 50.0)
     slope = mars_data.get('slope', 2.0)
+    # Surface-temp NN/XGB were trained with Day Side Thermal Inertia in column 3 (see surface_temp_predictor.py).
+    # Must match that quantity at inference — not yearly average °C (`temperature`).
+    ti_surface_temp = mars_data.get("thermalInertia")
+    if ti_surface_temp is None:
+        ti_surface_temp = mars_data.get("thermal_inertia")
+    if ti_surface_temp is None:
+        ti_surface_temp = 300.0
+    else:
+        ti_surface_temp = float(ti_surface_temp)
     
     if model_name == 'slope':
         features = [albedo, temperature, roughness, ferric, elevation, temp_range, abs(slope), abs(slope * 0.1)]
@@ -159,7 +168,7 @@ def map_mars_data_to_features(mars_data, model_name):
             normalized_features = [[features[0] / 10000.0, features[1] / 10.0, features[2] / 100.0, features[3] / 100.0, features[4] / 10.0, features[5]]]
     elif model_name == 'surface_temp':
         # Surface temp model: 5 features - ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km']
-        features = [elevation, albedo, temperature, slope, roughness]
+        features = [elevation, albedo, ti_surface_temp, slope, roughness]
         if 'surface_temp' in scalers:
             normalized_features = scalers['surface_temp'].transform([features])
         else:
