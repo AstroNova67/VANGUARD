@@ -71,6 +71,7 @@ dependencies = [
     "Flask==2.3.3",
     "Flask-CORS==4.0.0",
     "gunicorn>=23.0.0",
+    "rasterio>=1.4.4",
 ]
 
 [dependency-groups]

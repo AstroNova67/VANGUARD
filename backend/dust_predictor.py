@@ -7,7 +7,6 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
-# import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler, QuantileTransformer
 
@@ -15,10 +14,6 @@ SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
 tf.random.set_seed(SEED)
-print("GPUs:", tf.config.list_physical_devices('GPU'))
-from tensorflow.python.client import device_lib
-
-print(device_lib.list_local_devices())
 
 
 class DustPredictor:
@@ -159,26 +154,24 @@ class DustPredictor:
         print("MAE:", mae)
 
 
-# Usage
-model = DustPredictor(
-    "datasets/dust_small.csv",
-    'OMEGA Ferric/Dust 860nm ratio',
-    [
-        "Elevation",
-        "Slope",
-        "Yearly Average Mars Surface Temperature",
-        "Dayside Thermal Inertia",
-        "MOLA 128ppd Aspect",
-        "Albedo"
-    ]
-)
+if __name__ == "__main__":
+    from tensorflow.python.client import device_lib
 
-transform = 'quantile'  # choose 'log' or 'quantile'
+    print("GPUs:", tf.config.list_physical_devices("GPU"))
+    print(device_lib.list_local_devices())
 
-model.preprocess()
-# model.tuner_search()
-model.load_best_model()
-
-# Metrics
-# R2: 0.854063568466665
-# MAE: 0.006056298268290478
+    model = DustPredictor(
+        "datasets/dust_small.csv",
+        "OMEGA Ferric/Dust 860nm ratio",
+        [
+            "Elevation",
+            "Slope",
+            "Yearly Average Mars Surface Temperature",
+            "Dayside Thermal Inertia",
+            "MOLA 128ppd Aspect",
+            "Albedo",
+        ],
+        transform="quantile",
+    )
+    model.preprocess()
+    model.load_best_model()

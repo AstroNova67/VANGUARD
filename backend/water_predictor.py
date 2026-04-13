@@ -101,21 +101,20 @@ class WaterPredictor:
         print("MAE:", mae)
 
 
-# Usage
-model = WaterPredictor(
-    "datasets/water_WEH_%.csv",
-    'Mars Odyssey Neutron Spectrometer % WEH',
-    [
-        'MOLA 128ppd Elevation',
-        'OMEGA Est. Lambert Albedo 1080nm',
-        'Dayside Thermal Inertia (20 ppd) (Putzig and Mellon 2007)',
-        'TES Basalt Abundance - Numeric',
-        'Yearly Average Mars Surface Temperature',
-        'Latitude (N)',
-        'OMEGA Band depth at 2000 nm',
-        'Crustal Thickness (km)'
-    ]
-)
-model.preprocess()
-# model.tuner_search()
-model.load_best_model()
+if __name__ == "__main__":
+    model = WaterPredictor(
+        "datasets/water_WEH_%.csv",
+        "Mars Odyssey Neutron Spectrometer % WEH",
+        [
+            "MOLA 128ppd Elevation",
+            "OMEGA Est. Lambert Albedo 1080nm",
+            "Dayside Thermal Inertia (20 ppd) (Putzig and Mellon 2007)",
+            "TES Basalt Abundance - Numeric",
+            "Yearly Average Mars Surface Temperature",
+            "Latitude (N)",
+            "OMEGA Band depth at 2000 nm",
+            "Crustal Thickness (km)",
+        ],
+    )
+    model.preprocess()
+    model.load_best_model()

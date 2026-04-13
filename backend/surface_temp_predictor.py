@@ -18,46 +18,10 @@ SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
 tf.random.set_seed(SEED)
-# physical_devices = tf.config.list_physical_devices('GPU')
-# print("Num GPUs Available: ", len(physical_devices))
-# tf.config.experimental.set_memory_growth(physical_devices[0], True)
-
 
 # Feature columns and target variable
 independent_variables = ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km']
 dependent_variable = 'Yearly Average Mars Surface Temperature (C)'
-
-# regions = [
-#     'datasets/raw_data/Regions/Region_1.csv',
-#     'datasets/raw_data/Regions/Region_2.csv',
-#     'datasets/raw_data/Regions/Region_3.csv',
-#     'datasets/raw_data/Regions/Region_4.csv',
-#     'datasets/raw_data/Regions/Region_5.csv'
-# ]
-#
-# dfs = []
-#
-# for path in regions:
-#     try:
-#         df = pd.read_csv(path, encoding='utf-8')
-#     except UnicodeDecodeError:
-#         df = pd.read_csv(path, encoding='latin1')  # fallback for encoding errors
-#
-#     df.columns = df.columns.str.strip()  # remove any extra spaces in column names
-#     dfs.append(df)
-#
-# # Combine all into one training DataFrame
-# df_train = pd.concat(dfs, ignore_index=True)
-#
-# # Save combined file
-# df_train.to_csv('datasets/combined_regions.csv', index=False)
-#
-# print("Combined region dataset saved as 'combined_regions.csv'")
-df = pd.read_csv('datasets/combined_regions.csv')
-
-
-# print(df.isnull().sum())
-# print(df.shape)
 
 
 class SurfaceTempRegressor:
@@ -330,36 +294,9 @@ class SurfaceTempNetwork:
         print("MAE:", mae)
 
 
-# Instantiate and run
-
-model = SurfaceTempRegressor(df)
-# model.train_models()
-# model.graph()
-# model.random_search()
-# model.save_model()
-model.load_model()
-model.print_score(0)
-model.print_score(1)
-# model.print_score(2)
-# model.print_score(3)
-
-model = SurfaceTempNetwork('datasets/combined_regions.csv',
-                           'Yearly Average Mars Surface Temperature (C)',
-                           ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km'],
-                           )
-# model.preprocess()
-# # model.tuner_search()
-# model.load_best_model()
-
-
-# Metrics
-# Best Random Search (Neural) Parameters: {'n_units': 64, 'n_hidden_layers': 3, 'learning_rate': 0.001, 'epochs': 30, 'batch_size': 32, 'activation': 'tanh'}
-# Neural Network
-# R2: 0.8621649700697012
-# MAE: 4.455943061752762
-# Best parameters (XGB): {'learning_rate': np.float64(0.16159252052077827), 'max_depth': 9, 'n_estimators': 189, 'subsample': np.float64(0.8050838253488191)}
-# Best parameters (Forest): {'bootstrap': False, 'max_depth': 19, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 6, 'n_estimators': 123}
-# Score (Baseline Random Forest): 92.95%
-# Score (Baseline XGBoost): 91.12%
-# Score (Grid Search XGBoost): 92.226%
-# Score (Grid Search Random Forest): 92.775%
+if __name__ == "__main__":
+    df = pd.read_csv("datasets/combined_regions.csv")
+    model = SurfaceTempRegressor(df)
+    model.load_model()
+    model.print_score(0)
+    model.print_score(1)

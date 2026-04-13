@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Optional: set to e.g. http://127.0.0.1:5002 when the page is not served by Flask (live-server). -->
+    <meta name="vanguard-api-base" content="" />
     <title>VANGUARD — Mars landing analysis</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔴</text></svg>">
     <style>
@@ -10,6 +12,10 @@
       *::before,
       *::after {
         box-sizing: border-box;
+      }
+
+      body > canvas {
+        display: block;
       }
 
       body {
@@ -27,8 +33,10 @@
         -webkit-font-smoothing: antialiased;
       }
 
+      /* Globe canvas is inserted before this node; keep UI above the WebGL layer. */
       #controls {
         position: absolute;
+        z-index: 2;
         top: 12px;
         left: 12px;
         /* Readable sidebar without hiding the globe; horizontal scroll when the prediction table needs it. */
@@ -154,6 +162,239 @@
         font-size: 12px;
         color: #9bb0c0;
         white-space: nowrap;
+      }
+
+      .overlay-toggle-card {
+        margin-top: 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .ml-suitability-overlay-card {
+        margin-bottom: 10px;
+      }
+
+      .ml-suitability-overlay-card .overlay-toggle-hint {
+        margin-left: 0;
+      }
+
+      .overlay-toggle {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        color: #cde6f5;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+
+      .overlay-toggle input {
+        margin-top: 3px;
+        flex-shrink: 0;
+      }
+
+      .overlay-toggle-hint {
+        margin: 0 0 0 26px;
+        font-size: 11px;
+        color: #8eb8d0;
+        min-height: 1.2em;
+        line-height: 1.4;
+      }
+
+      .overlay-toggle-foot {
+        margin: 0;
+        font-size: 10px;
+        line-height: 1.45;
+        color: #6d8a9c;
+      }
+
+      .overlay-toggle-foot code {
+        font-size: 10px;
+        color: #a8cce0;
+      }
+
+      .landing-overlay-legend {
+        display: none;
+        width: 100%;
+        margin-top: 4px;
+        padding: 10px 10px 8px;
+        border-radius: 8px;
+        background: rgba(20, 45, 70, 0.55);
+        border: 1px solid rgba(120, 175, 220, 0.22);
+      }
+
+      .landing-overlay-legend.is-visible {
+        display: block;
+      }
+
+      .landing-overlay-legend__title {
+        margin: 0 0 8px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #8eb8d8;
+      }
+
+      .landing-overlay-legend__subtitle {
+        margin: -4px 0 8px;
+        font-size: 10px;
+        line-height: 1.4;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: normal;
+        color: #7a9aad;
+      }
+
+      .landing-overlay-legend__bar {
+        height: 14px;
+        width: 100%;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        /* Background set in JS (`landingSuitabilityLegendGradientCss`) to match globe tint */
+        min-height: 14px;
+      }
+
+      .landing-overlay-legend__ticks {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 6px;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        color: #9bb8cc;
+      }
+
+      .landing-overlay-legend__ticks span {
+        max-width: 32%;
+        line-height: 1.25;
+      }
+
+      .landing-overlay-legend__ticks span:last-child {
+        text-align: right;
+      }
+
+      .landing-overlay-legend__note {
+        margin: 8px 0 0;
+        font-size: 10px;
+        line-height: 1.45;
+        color: #6d8a9c;
+      }
+
+      .landing-overlay-legend__sub {
+        display: inline-block;
+        margin-top: 2px;
+        font-size: 9px;
+        font-weight: 500;
+        color: #6d8a9c;
+        text-transform: none;
+        letter-spacing: normal;
+      }
+
+      .globe-surface-card {
+        margin-top: 10px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+
+      .globe-surface-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #6a9aba;
+      }
+
+      .globe-surface-select {
+        width: 100%;
+        margin: 0;
+        padding: 8px 10px;
+        font-size: 12px;
+        color: #e8f0f7;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(120, 175, 220, 0.25);
+        border-radius: 8px;
+      }
+
+      .globe-raster-legend__keyline {
+        margin: 0 0 8px;
+        font-size: 10px;
+        line-height: 1.45;
+        color: #8aaabe;
+      }
+
+      .globe-raster-legend__keyline code {
+        font-size: 10px;
+        color: #c4dff0;
+      }
+
+      .manual-coords {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .manual-coords-title {
+        margin: 0 0 8px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #6a9aba;
+      }
+
+      .manual-coords-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: flex-end;
+        margin-bottom: 10px;
+      }
+
+      .manual-coords-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+        flex: 1 1 120px;
+      }
+
+      .manual-coords-field label {
+        font-size: 11px;
+        color: #9bb0c0;
+        font-weight: 600;
+      }
+
+      .manual-coords-field input {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        color: #e8f0f7;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(120, 175, 220, 0.25);
+        border-radius: 8px;
+      }
+
+      .manual-coords-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .manual-coords-feedback {
+        margin: 8px 0 0;
+        font-size: 11px;
+        line-height: 1.4;
+        color: #e8a090;
+        min-height: 1.2em;
+      }
+
+      .manual-coords-feedback:empty {
+        display: none;
       }
 
       #coords {
@@ -359,6 +600,28 @@
         box-shadow: 0 0 0 1px rgba(255, 190, 120, 0.75);
       }
 
+      .pred-grid-scroll-hint {
+        font-size: 11px;
+        line-height: 1.45;
+        color: #b8d0e8;
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(30, 70, 120, 0.35);
+        border: 1px solid rgba(120, 180, 255, 0.22);
+      }
+
+      .pred-api-warn {
+        font-size: 11px;
+        line-height: 1.45;
+        color: #ffe0b0;
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(120, 60, 20, 0.35);
+        border: 1px solid rgba(255, 180, 100, 0.35);
+      }
+
       .pred-grid-scroll {
         overflow-x: auto;
         overflow-y: visible;
@@ -543,8 +806,10 @@
       }
 
       .pred-value--for-landing-score {
-        background: rgba(255, 175, 80, 0.12);
-        box-shadow: 0 0 0 1px rgba(255, 190, 120, 0.55);
+        background: rgba(255, 175, 80, 0.22);
+        box-shadow:
+          0 0 0 2px rgba(255, 200, 120, 0.85),
+          0 0 14px rgba(255, 190, 100, 0.25);
         border-radius: 8px;
         padding: 4px 6px 5px;
         margin: 0;
@@ -567,6 +832,10 @@
 
       .pred-score-pin--xgb {
         color: #ffcc88;
+      }
+
+      .pred-score-pin--raster {
+        color: #7dd3c0;
       }
 
       .pred-value--nn.pred-value--delta-good {
@@ -803,7 +1072,7 @@
         </p>
       </header>
 
-      <section class="panel-section" aria-label="Lighting">
+      <section class="panel-section" aria-label="Scene">
         <div class="panel-section-title">Scene</div>
         <div class="control-card">
           <button type="button" class="btn-secondary" id="toggleSun">Pause / resume sun</button>
@@ -814,15 +1083,80 @@
         </div>
       </section>
 
+      <section class="panel-section" aria-label="Global batch map overlay">
+        <div class="panel-section-title">Global batch map overlay</div>
+        <div class="control-card overlay-toggle-card ml-suitability-overlay-card">
+          <label class="overlay-toggle" for="landingMlOverlayToggle">
+            <input type="checkbox" id="landingMlOverlayToggle" aria-label="Show ML suitability GeoTIFF on the globe" />
+            <span>Show <code>mars_landing_suitability_ml.tif</code> (ML suitability, 0–100%)</span>
+          </label>
+          <p class="overlay-toggle-hint" id="landingOverlayStatus" aria-live="polite"></p>
+          <p class="overlay-toggle-foot">
+            GPU-downscaled and ~55% blended with the base Mars photo. <strong>Globe surface (GeoTIFF)</strong> below is
+            disabled while this overlay is on.
+          </p>
+          <div id="landingOverlayLegend" class="landing-overlay-legend" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-label="Globe surface">
+        <div class="panel-section-title">Globe surface (GeoTIFF)</div>
+        <div class="control-card globe-surface-card">
+          <label class="globe-surface-label" for="globeSurfaceLayer">Layer on the globe</label>
+          <select id="globeSurfaceLayer" class="globe-surface-select" aria-label="Drape a raster on the Mars globe">
+            <option value="photo">Mars photo (default)</option>
+          </select>
+          <p class="overlay-toggle-hint" id="globeSurfaceStatus" aria-live="polite"></p>
+          <div id="globeRasterLegend" class="landing-overlay-legend" aria-hidden="true"></div>
+        </div>
+      </section>
+
       <section class="panel-section" aria-label="Sampled rasters">
         <div class="panel-section-title">Values at this click</div>
         <div id="coords" class="coords--empty">
-          <span class="coords-placeholder">Click anywhere on Mars. Raster values for that point will show here (all layers load on first click).</span>
+          <span class="coords-placeholder"
+            >Click Mars or enter latitude / longitude below. Raster values for that point will show here (all layers load
+            on first use).</span
+          >
+        </div>
+        <div class="manual-coords" aria-label="Manual coordinates">
+          <p class="manual-coords-title">Enter coordinates</p>
+          <div class="manual-coords-row">
+            <div class="manual-coords-field">
+              <label for="manualLat">Latitude (°)</label>
+              <input
+                id="manualLat"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                placeholder="−4.60"
+                aria-label="Latitude in degrees north positive"
+              />
+            </div>
+            <div class="manual-coords-field">
+              <label for="manualLon">Longitude (°)</label>
+              <input
+                id="manualLon"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                placeholder="137.44"
+                aria-label="Longitude in degrees east positive"
+              />
+            </div>
+          </div>
+          <div class="manual-coords-actions">
+            <button type="button" class="btn-secondary" id="applyManualLatLon">Load rasters here</button>
+          </div>
+          <p class="manual-coords-feedback" id="manualCoordsFeedback" role="status"></p>
         </div>
       </section>
 
       <section class="panel-section" aria-label="Prediction">
         <div class="panel-section-title">Landing prediction</div>
+        <p class="predict-hint" id="apiModelsStatus" aria-live="polite">
+          Checking ML API (Keras + XGBoost on server)…
+        </p>
         <button type="button" id="predictLanding" style="display: none;">Run landing suitability</button>
         <p class="predict-hint" id="predictHint" style="display: none">
           Uses neural models plus XGBoost where available. The table compares rasters you sampled to model outputs.
@@ -834,6 +1168,6 @@
     <!-- Load GeoTIFF as global -->
     <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     <!-- Your Three.js script -->
-    <script type="module" src="index.js"></script>
+    <script type="module" src="index.js?v=15"></script>
   </body>
 </html>

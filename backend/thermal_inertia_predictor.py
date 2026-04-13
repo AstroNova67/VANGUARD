@@ -1,4 +1,3 @@
-import pandas as pd
 import joblib
 import keras_tuner as kt
 import matplotlib.pyplot as plt
@@ -11,24 +10,6 @@ from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.preprocessing import RobustScaler, QuantileTransformer
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
-
-# df_red_green = pd.read_csv('datasets/raw_data/Thermal_Inertia/region_red-green.csv')
-# df_blue = pd.read_csv('datasets/raw_data/Thermal_Inertia/region_blue.csv')
-# df_purple = pd.read_csv('datasets/raw_data/Thermal_Inertia/region_purple.csv')
-#
-#
-# print(df_red_green.shape, df_blue.shape, df_purple.shape)
-# print(df_red_green.isnull().sum(), df_blue.isnull().sum(), df_purple.isnull().sum())
-
-df = pd.read_csv('datasets/combined_thermal_inertia_region.csv')
-
-df.dropna(inplace=True)
-print(df.isnull().sum())
-
-
-# datasets = [df_red_green, df_blue, df_purple]
-# df = pd.concat(datasets, ignore_index = True)
-# df.to_csv('datasets/combined_thermal_inertia_region.csv')
 
 class ThermalInertiaPredictor:
     def __init__(self, dataset):
@@ -260,51 +241,12 @@ class ThermalInertiaNeuralNetwork:
         mae = mean_absolute_error(self.y_test, y_pred)
         print(f'Score (Neural Network Tuned): {round(score_neural * 100, 3)}%')
         print(f'MAE: {round(mae, 3)}')
-        # # Original sample
-        # x_orig = np.array([[-164.4290009, 0.237795278, 1.2856848239898682, 0.990284503]])
-        #
-        # # Transform features using the trained QuantileTransformer
-        # x_transformed = self.qt_x.transform(x_orig)
-        #
-        # # Make prediction
-        # prediction = best_model.predict(x_transformed)
-        #
-        # print(self.qt_y.inverse_transform(prediction).ravel())
 
 
-# network = ThermalInertiaNeuralNetwork(df)
-# network.preprocessing()
-# network.load_best_model()
+if __name__ == "__main__":
+    df = pd.read_csv("datasets/combined_thermal_inertia_region.csv")
+    df.dropna(inplace=True)
+    model = ThermalInertiaPredictor(df)
+    model.load_model()
+    model.predict()
 
-model = ThermalInertiaPredictor(df)
-# model.plot_histogram()
-# model.train()
-# model.random_search()
-# model.save_model()
-model.load_model()
-model.predict()
-
-# Metrics
-
-# quantiled transformed
-# Score (Neural Network Tuned): 75.092%
-# MAE: 30.498
-
-# XGBoost Score: 76.806%
-# SVR Score: 72.847%
-# Random Forest Score: 76.994%
-
-# Log transform
-# XGBoost Score: 76.141%
-# SVR Score: 72.64%
-# Random Forest Score: 76.663%
-
-# quantiled transformed (untuned)
-# XGBoost Score: 77.26%
-# Random Forest Score: 77.632%
-
-
-# XGBoost Score: -3263690.028%
-# Random Forest Score: -3304452.767%
-# Random Forest cross: [-1.26761662  0.08991035 -0.02908539]%
-# XGBoost cross: [-1.23433435  0.13334332 -0.04994441]%

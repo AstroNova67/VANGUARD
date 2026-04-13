@@ -10,45 +10,9 @@ from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.preprocessing import RobustScaler
 from xgboost import XGBRegressor
 
-df_white = pd.read_csv('datasets/raw_data/Slope_Prediction_Dataset/Region_White.csv')
-df_gray = pd.read_csv('datasets/raw_data/Slope_Prediction_Dataset/Region_Gray.csv')
-df_black = pd.read_csv('datasets/raw_data/Slope_Prediction_Dataset/Region_Black.csv')
+df = pd.read_csv("datasets/combined_slope_regions.csv")
 
-# print(df_white.isnull().sum())
-# print(df_white.shape)
-# print(df_gray.isnull().sum())
-# print(df_gray.shape)
-# print(df_black.isnull().sum())
-# print(df_black.shape)
-
-# df_combined = pd.concat([df_white, df_gray, df_black], ignore_index = True)
-#
-# df_combined.to_csv('datasets/combined_slope_regions.csv', index = False)
-
-# df = pd.read_csv('datasets/combined_slope_regions.csv')
-# 163,690 rows
-
-# Rolling window stats
-# df['Elevation_rolling_mean'] = df['Elevation'].rolling(window=5, center=True).mean()
-# df['Elevation_rolling_max_diff'] = (
-#         df['Elevation'].rolling(window=5, center=True).max() -
-#         df['Elevation'].rolling(window=5, center=True).min()
-# )
-#
-# # First and second differences
-# df['Elevation_diff'] = df['Elevation'].diff()
-# df['Elevation_diff_abs'] = df['Elevation_diff'].abs()
-#
-# df['Elevation_diff2'] = df['Elevation_diff'].diff()
-# df['Elevation_diff2_abs'] = df['Elevation_diff2'].abs()
-#
-# # Drop raw and intermediate columns
-# df.drop(columns=['Elevation', 'Elevation_diff', 'Elevation_diff2'], inplace=True)
-# df.to_csv('datasets/combined_slope_regions.csv', index=False)
-
-df = pd.read_csv('datasets/combined_slope_regions.csv')
-
-df['Slope_Log'] = np.log1p(df['Slope (degrees)'])
+df["Slope_Log"] = np.log1p(df["Slope (degrees)"])
 independent_variables = ['Albedo', 'Day Side Thermal Inertia', 'Roughness', 'OMEGA Ferric/Dust 860nm ratio',
                          'Elevation_rolling_mean', 'Elevation_rolling_max_diff', 'Elevation_diff_abs',
                          'Elevation_diff2_abs']
@@ -238,24 +202,7 @@ class SlopeRegressor:
                 print(f'Score (XGBoost Tuned): {round(array_best[index] * 100, 3)}%')
 
 
-model = SlopeNeuralNetwork(df)
-model.preprocessing()
-# model.tuner_search()
-model.load_best_model()
-# model.predict()
-
-# regressor = SlopeRegressor(df)
-# regressor.preprocessing()
-# regressor.train()
-# regressor.graph()
-# # regressor.random_search()
-# regressor.predict(0)
-# regressor.predict(1)
-
-# Metrics
-# Score (Neural Network Tuned): 80.517%
-# MAE: 0.221
-# Score (Random Forest): 81.665%
-# Score (XGBoost): 82.097%
-# Best parameters (XGB): {'learning_rate': 0.04128851382805829, 'max_depth': 9, 'n_estimators': 195, 'subsample': 0.9272820822527561}
-# Best parameters (Forest): {'bootstrap': False, 'max_depth': 19, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 6, 'n_estimators': 123}
+if __name__ == "__main__":
+    model = SlopeNeuralNetwork(df)
+    model.preprocessing()
+    model.load_best_model()

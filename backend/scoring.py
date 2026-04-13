@@ -11,8 +11,66 @@ logging.getLogger("tensorflow").setLevel(logging.ERROR)
 # Global variable to store loaded scalers
 scalers = {}
 
+# Neural nets loaded once (used by predict_properties_nn and batch raster jobs)
+_nn_models = None
+
 # Resolve paths relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# --- Raster-first scoring: which JSON/stack fields count as ground truth per scored property ---
+DATA_SOURCE_RASTER = "raster"
+DATA_SOURCE_ML_PREDICTED = "ml_predicted"
+
+# Keys tried in order (first valid value wins). Must match globe `marsDatasets` / batch stack.
+MARS_DATA_RASTER_KEY_PRIORITY = {
+    "slope": ("slope",),
+    "dust": ("ferric",),  # OMEGA ferric/dust index (same source as UI dustObserved)
+    "surface_temp": ("temperature",),
+    "thermal_inertia": ("thermalInertia", "thermal_inertia"),
+    "water": ("grsWaterWt",),
+}
+
+
+def raster_observation_valid_scalar(value) -> bool:
+    """True if a single payload/stack value is finite and not missing."""
+    if value is None:
+        return False
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return False
+    return bool(np.isfinite(f))
+
+
+def mars_raster_observation_valid(mars_data: dict, property_name: str) -> bool:
+    """Whether `mars_data` carries a usable raster observation for this scored property."""
+    keys = MARS_DATA_RASTER_KEY_PRIORITY[property_name]
+    for k in keys:
+        if raster_observation_valid_scalar(mars_data.get(k)):
+            return True
+    return False
+
+
+def mars_raster_value_for_property(mars_data: dict, property_name: str):
+    """First valid numeric raster value for `property_name`, or None."""
+    for k in MARS_DATA_RASTER_KEY_PRIORITY[property_name]:
+        v = mars_data.get(k)
+        if raster_observation_valid_scalar(v):
+            return float(v)
+    return None
+
+
+def raster_band_valid(arr: np.ndarray, nodata) -> np.ndarray:
+    """
+    Element-wise mask: finite and not equal to GDAL nodata (when defined).
+    Aligns with batch `_per_band_nodata_mask` single-band logic.
+    """
+    arr = np.asarray(arr, dtype=np.float64)
+    ok = np.isfinite(arr)
+    if nodata is not None and not (isinstance(nodata, float) and np.isnan(nodata)):
+        ok &= arr != float(nodata)
+    return ok
+
 
 def load_scalers():
     """Load all saved scalers and transformers"""
@@ -92,13 +150,26 @@ class LandingSuitabilityScorer:
             score = 1 - score
         return score
 
-    def score_site(self, slope, dust, surface_temp, thermal_inertia, water):
+    def score_site(
+        self,
+        slope,
+        dust,
+        surface_temp,
+        thermal_inertia,
+        water,
+        property_sources=None,
+    ):
         """
         Score a landing site based on predicted surface properties.
-        
+
         Scoring ranges based on ML model predictions and NASA engineering constraints.
         See LANDING_SCORING_SOURCES.md for detailed source citations.
+
+        property_sources: optional dict mapping each property name to \"raster\" or
+        \"ml_predicted\" (API `data_sources`). Ignored for arithmetic; accepted for
+        transparency and future extensions.
         """
+        _ = property_sources  # echoed at API layer; rubric unchanged
         # Slope: <30° constraint for rover stability (Golombek et al., 2012)
         # Range 0-5° selected for discrimination within safe zone
         slope_score = self.normalize(slope, 0, 5, invert=True)  # ML gives 0.7-4.8°, so use 0-5°
@@ -128,6 +199,50 @@ class LandingSuitabilityScorer:
         )
 
         return round(final_score * 100, 2)
+
+    def score_site_arrays(self, slope, dust, surface_temp, thermal_inertia, water):
+        """
+        Same rubric as score_site, vectorized over numpy arrays (element-wise).
+        Returns float32 percent in [0, 100], shape broadcast from inputs.
+        """
+        slope = np.asarray(slope, dtype=np.float64)
+        dust = np.asarray(dust, dtype=np.float64)
+        surface_temp = np.asarray(surface_temp, dtype=np.float64)
+        thermal_inertia = np.asarray(thermal_inertia, dtype=np.float64)
+        water = np.asarray(water, dtype=np.float64)
+
+        slope_score = self.normalize(slope, 0, 5, invert=True)
+        dust_score = self.normalize(dust, 0.6, 0.7, invert=True)
+        temp_score = self.normalize(surface_temp, -90, -40, invert=False)
+        inertia_score = self.normalize(thermal_inertia, 100, 400, invert=False)
+        water_score = self.normalize(water, 1, 8, invert=False)
+
+        final_score = (
+            slope_score * self.weights["slope"]
+            + dust_score * self.weights["dust"]
+            + temp_score * self.weights["surface_temp"]
+            + inertia_score * self.weights["thermal_inertia"]
+            + water_score * self.weights["water"]
+        )
+        return np.round(np.clip(final_score, 0, 1) * 100, 2).astype(np.float32)
+
+
+def get_nn_models():
+    """Load all five Keras NNs once and cache them."""
+    global _nn_models
+    if _nn_models is not None:
+        return _nn_models
+    _nn_models = {}
+    paths = {
+        "slope": os.path.join(BASE_DIR, "saved_models", "neural_nets", "slope_pred", "best_model.keras"),
+        "dust": os.path.join(BASE_DIR, "saved_models", "neural_nets", "dust_predictor", "best_model.keras"),
+        "surface_temp": os.path.join(BASE_DIR, "saved_models", "neural_nets", "surface_temp_pred", "best_model.keras"),
+        "thermal_inertia": os.path.join(BASE_DIR, "saved_models", "neural_nets", "thermal_inertia_predictor", "best_model.keras"),
+        "water": os.path.join(BASE_DIR, "saved_models", "neural_nets", "water_predictor", "best_model.keras"),
+    }
+    for name, path in paths.items():
+        _nn_models[name] = tf.keras.models.load_model(path)
+    return _nn_models
 
 
 # Example: Using Neural Network predictions
@@ -231,6 +346,42 @@ def inverse_transform_predictions(slope_pred, dust_pred, temp_pred, TI_pred, wat
     
     return slope_real, dust_real, temp_real, TI_real, water_real
 
+
+def inverse_transform_predictions_batch(slope_pred, dust_pred, temp_pred, TI_pred, water_pred):
+    """
+    Vectorized version of inverse_transform_predictions for 1-D arrays of equal length.
+    """
+    if not scalers:
+        load_scalers()
+    slope_pred = np.asarray(slope_pred, dtype=np.float64)
+    dust_pred = np.asarray(dust_pred, dtype=np.float64)
+    temp_pred = np.asarray(temp_pred, dtype=np.float64)
+    TI_pred = np.asarray(TI_pred, dtype=np.float64)
+    water_pred = np.asarray(water_pred, dtype=np.float64)
+
+    slope_real = np.maximum(0, np.expm1(slope_pred))
+
+    if "dust_target" in scalers:
+        dust_real = scalers["dust_target"].inverse_transform(dust_pred.reshape(-1, 1)).ravel()
+    else:
+        dust_real = np.clip(0.5 + dust_pred * 0.2, 0.0, 1.0)
+
+    if "surface_temp_y_min" in scalers:
+        y_min = float(scalers["surface_temp_y_min"])
+        temp_real = np.expm1(temp_pred) + y_min - 1
+    else:
+        temp_real = np.expm1(temp_pred) - 100 - 1
+
+    if "thermal_inertia_target" in scalers:
+        TI_real = scalers["thermal_inertia_target"].inverse_transform(TI_pred.reshape(-1, 1)).ravel()
+    else:
+        TI_real = np.clip(400 + TI_pred * 200, 100, 1200)
+
+    water_real = np.maximum(0, np.expm1(water_pred))
+
+    return slope_real, dust_real, temp_real, TI_real, water_real
+
+
 def predict_properties_nn(mars_data):
     """
     mars_data: dict with Mars surface data
@@ -240,17 +391,23 @@ def predict_properties_nn(mars_data):
     if not scalers:
         load_scalers()
     try:
+        models = get_nn_models()
         # Get raw model predictions
-        slope_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'slope_pred', 'best_model.keras')).predict(
-            map_mars_data_to_features(mars_data, 'slope'))[0][0]
-        dust_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'dust_predictor', 'best_model.keras')).predict(
-            map_mars_data_to_features(mars_data, 'dust'))[0][0]
-        temp_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'surface_temp_pred', 'best_model.keras')).predict(
-            map_mars_data_to_features(mars_data, 'surface_temp'))[0][0]
-        TI_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'thermal_inertia_predictor', 'best_model.keras')).predict(
-            map_mars_data_to_features(mars_data, 'thermal_inertia'))[0][0]
-        water_pred_raw = tf.keras.models.load_model(os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'water_predictor', 'best_model.keras')).predict(
-            map_mars_data_to_features(mars_data, 'water'))[0][0]
+        slope_pred_raw = models["slope"].predict(
+            map_mars_data_to_features(mars_data, "slope"), verbose=0
+        )[0][0]
+        dust_pred_raw = models["dust"].predict(
+            map_mars_data_to_features(mars_data, "dust"), verbose=0
+        )[0][0]
+        temp_pred_raw = models["surface_temp"].predict(
+            map_mars_data_to_features(mars_data, "surface_temp"), verbose=0
+        )[0][0]
+        TI_pred_raw = models["thermal_inertia"].predict(
+            map_mars_data_to_features(mars_data, "thermal_inertia"), verbose=0
+        )[0][0]
+        water_pred_raw = models["water"].predict(
+            map_mars_data_to_features(mars_data, "water"), verbose=0
+        )[0][0]
         
         # Apply inverse transformations
         slope_pred, dust_pred, temp_pred, TI_pred, water_pred = inverse_transform_predictions(

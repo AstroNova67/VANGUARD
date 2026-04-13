@@ -3,6 +3,7 @@ import mimetypes
 import os
 import pickle
 import sys
+import traceback
 import warnings
 
 # Pickled scalers may be one sklearn micro-version off from the installed wheel; suppress noisy UI.
@@ -14,7 +15,7 @@ except ImportError:
     pass
 
 # Quieter TensorFlow C++ logs (must be set before importing tensorflow).
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -49,7 +50,7 @@ try:
     if gpus:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
-except:
+except Exception:
     pass
 
 # Set TensorFlow to use less memory
@@ -60,10 +61,18 @@ tf.config.run_functions_eagerly(False)
 # Handle imports for both local development and production (Render)
 # Try absolute import first (for Render), fall back to relative import (for local)
 try:
-    from backend.scoring import LandingSuitabilityScorer, predict_properties_nn
+    from backend.scoring import (
+        DATA_SOURCE_ML_PREDICTED,
+        LandingSuitabilityScorer,
+        predict_properties_nn,
+    )
 except ImportError:
     # For local development when running from backend/ directory
-    from scoring import LandingSuitabilityScorer, predict_properties_nn
+    from scoring import (
+        DATA_SOURCE_ML_PREDICTED,
+        LandingSuitabilityScorer,
+        predict_properties_nn,
+    )
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
@@ -131,7 +140,7 @@ def _fuse_surface_temp_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
         if xgb_ok:
             candidates.append(("xgb", float(xgb_val), abs(float(xgb_val) - obs_f)))
         if not candidates:
-            return (float(nn_val) if nn_ok else 0.0, None)
+            return (float(nn_val), "surface_temp_nn") if nn_ok else (0.0, None)
         # Min error; tie-break prefers XGB
         candidates.sort(key=lambda t: (t[2], 0 if t[0] == "xgb" else 1))
         winner, val, _ = candidates[0]
@@ -140,7 +149,9 @@ def _fuse_surface_temp_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
 
     if xgb_ok:
         return (float(xgb_val), "surface_temp_xgb")
-    return (float(nn_val) if nn_ok else 0.0, None)
+    if nn_ok:
+        return (float(nn_val), "surface_temp_nn")
+    return (0.0, None)
 
 
 def _fuse_thermal_inertia_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
@@ -163,14 +174,16 @@ def _fuse_thermal_inertia_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
         if xgb_ok:
             candidates.append(("xgb", float(xgb_val), abs(float(xgb_val) - obs_f)))
         if not candidates:
-            return (float(nn_val) if nn_ok else 0.0, None)
+            return (float(nn_val), "thermal_inertia_nn") if nn_ok else (0.0, None)
         candidates.sort(key=lambda t: (t[2], 0 if t[0] == "xgb" else 1))
         src = "thermal_inertia_xgb" if candidates[0][0] == "xgb" else "thermal_inertia_nn"
         return (candidates[0][1], src)
 
     if xgb_ok:
         return (float(xgb_val), "thermal_inertia_xgb")
-    return (float(nn_val) if nn_ok else 0.0, None)
+    if nn_ok:
+        return (float(nn_val), "thermal_inertia_nn")
+    return (0.0, None)
 
 
 def load_scalers():
@@ -232,12 +245,16 @@ def load_models():
         'water': os.path.join(BASE_DIR, 'saved_models', 'neural_nets', 'water_predictor', 'best_model.keras')
     }
     
-    for model_name, model_path in model_paths.items():
+    # Keras-style terminal bar (same widget as training); load_model itself has no native progress.
+    _paths = list(model_paths.items())
+    _prog = tf.keras.utils.Progbar(len(_paths), unit_name="model")
+    for i, (model_name, model_path) in enumerate(_paths):
         try:
             neural_models[model_name] = keras.models.load_model(model_path)
-            _log_debug(f"  neural net: {model_name}")
+            _log_debug(f"  Keras neural net loaded: {model_name} ({model_path})")
         except Exception as e:
             _log_error(f"Failed to load neural net '{model_name}': {e}")
+        _prog.update(i + 1)
     
     # Try to load Regression models
     try:
@@ -260,7 +277,7 @@ def load_models():
             os.path.join(BASE_DIR, 'saved_models', 'regression_models', 'thermal_inertia', 'xgb_model.json')
         )
         
-        _log_debug("  regression: surface_temp + thermal_inertia (XGB)")
+        _log_info("  XGBoost regression loaded: surface_temp + thermal_inertia")
     except Exception as e:
         _log_error(f"Error loading regression models: {e}")
         regression_models = {}
@@ -374,14 +391,22 @@ def predict_landing_suitability():
                 'landing_score': 0
             }), 400
         
-        # Pure neural-network outputs (clamped for display; no XGB override).
+        # Pure neural-network outputs (clamped for display).
         nn_baseline = _clamp_predictions(predict_with_neural_networks(mars_data))
-
-        # Fused predictions: start from NN, optionally replace temp / TI with XGB when plausible.
-        fused_predictions = dict(nn_baseline)
         reg_predictions = predict_with_regression_models(mars_data)
 
         overrides_applied = {}
+        data_sources = {}
+        fused_predictions = {}
+
+        # Landing % always uses ML columns (UI pins only Neural / XGB). Slope, dust, water: Keras
+        # outputs. Surface temp / TI: NN vs XGB fusion (raster temperature / TI in the JSON
+        # still guides which model wins when both are plausible).
+        fused_predictions["slope"] = nn_baseline["slope"]
+        data_sources["slope"] = DATA_SOURCE_ML_PREDICTED
+
+        fused_predictions["dust"] = nn_baseline["dust"]
+        data_sources["dust"] = DATA_SOURCE_ML_PREDICTED
 
         surface_temp_xgb = reg_predictions.get("surface_temp_xgb", None)
         st_val, st_src = _fuse_surface_temp_for_score(
@@ -389,9 +414,19 @@ def predict_landing_suitability():
             surface_temp_xgb,
             mars_data,
         )
-        fused_predictions["surface_temp"] = st_val
-        if st_src is not None:
+        if st_src:
+            fused_predictions["surface_temp"] = st_val
             overrides_applied["surface_temp"] = st_src
+        elif _finite_number(nn_baseline.get("surface_temp")):
+            fused_predictions["surface_temp"] = float(nn_baseline["surface_temp"])
+            overrides_applied["surface_temp"] = "surface_temp_nn"
+        elif _finite_number(st_val):
+            fused_predictions["surface_temp"] = st_val
+            overrides_applied["surface_temp"] = "surface_temp_nn"
+        else:
+            fused_predictions["surface_temp"] = 0.0
+            overrides_applied["surface_temp"] = "surface_temp_nn"
+        data_sources["surface_temp"] = DATA_SOURCE_ML_PREDICTED
 
         thermal_inertia_xgb = reg_predictions.get("thermal_inertia_xgb", None)
         ti_val, ti_src = _fuse_thermal_inertia_for_score(
@@ -399,22 +434,35 @@ def predict_landing_suitability():
             thermal_inertia_xgb,
             mars_data,
         )
-        fused_predictions["thermal_inertia"] = ti_val
-        if ti_src is not None:
+        if ti_src:
+            fused_predictions["thermal_inertia"] = ti_val
             overrides_applied["thermal_inertia"] = ti_src
+        elif _finite_number(nn_baseline.get("thermal_inertia")):
+            fused_predictions["thermal_inertia"] = float(nn_baseline["thermal_inertia"])
+            overrides_applied["thermal_inertia"] = "thermal_inertia_nn"
+        elif _finite_number(ti_val):
+            fused_predictions["thermal_inertia"] = ti_val
+            overrides_applied["thermal_inertia"] = "thermal_inertia_nn"
+        else:
+            fused_predictions["thermal_inertia"] = 0.0
+            overrides_applied["thermal_inertia"] = "thermal_inertia_nn"
+        data_sources["thermal_inertia"] = DATA_SOURCE_ML_PREDICTED
+
+        fused_predictions["water"] = nn_baseline["water"]
+        data_sources["water"] = DATA_SOURCE_ML_PREDICTED
 
         fused_predictions = _clamp_predictions(fused_predictions)
-        
+
         # Landing score: LandingSuitabilityScorer matches LANDING_SCORING_SOURCES.md
         # (weights 30/20/20/20/10, normalization ranges, slope/dust inverted).
-        # Inputs are the final fused + clamped property predictions used in the API response.
         scorer = LandingSuitabilityScorer()
         landing_score = scorer.score_site(
-            slope=fused_predictions.get('slope', 0),
-            dust=fused_predictions.get('dust', 0),
-            surface_temp=fused_predictions.get('surface_temp', 0),
-            thermal_inertia=fused_predictions.get('thermal_inertia', 0),
-            water=fused_predictions.get('water', 0)
+            slope=fused_predictions.get("slope", 0),
+            dust=fused_predictions.get("dust", 0),
+            surface_temp=fused_predictions.get("surface_temp", 0),
+            thermal_inertia=fused_predictions.get("thermal_inertia", 0),
+            water=fused_predictions.get("water", 0),
+            property_sources=data_sources,
         )
 
         lat = mars_data.get("lat")
@@ -422,21 +470,34 @@ def predict_landing_suitability():
         loc = ""
         if lat is not None and lon is not None:
             loc = f" lat={lat} lon={lon}"
-        _log_info(f"POST /predict → landing_score={landing_score}%{loc}")
+        st_src_log = overrides_applied.get("surface_temp") or data_sources.get("surface_temp")
+        ti_src_log = overrides_applied.get("thermal_inertia") or data_sources.get(
+            "thermal_inertia"
+        )
+        _log_info(
+            f"POST /predict → landing_score={landing_score}%{loc} | "
+            f"score_inputs slope={fused_predictions.get('slope')} dust={fused_predictions.get('dust')} "
+            f"surface_temp={fused_predictions.get('surface_temp')} (src={st_src_log}) "
+            f"thermal_inertia={fused_predictions.get('thermal_inertia')} (src={ti_src_log}) "
+            f"water={fused_predictions.get('water')}"
+        )
         _log_debug(f"  fused: {fused_predictions}")
+        _log_debug(f"  data_sources: {data_sources}")
         _log_debug(f"  regression: {reg_predictions} overrides={overrides_applied}")
-        
+
         # Prepare response
         response = {
             'success': True,
             'landing_score': landing_score,
             'predictions': {
-                # Fused values used for landing_score (XGB may override temp / thermal inertia).
+                # Final property bundle used for landing_score (all ML: Keras for slope/dust/water;
+                # surface_temp and thermal_inertia from NN vs XGB fusion).
                 'neural_networks': fused_predictions,
-                # Neural nets only (before XGB override), for side-by-side UI.
+                # Neural nets only (for UI comparison; not necessarily what the score used).
                 'neural_networks_baseline': nn_baseline,
                 'regression_models': reg_predictions
             },
+            'data_sources': data_sources,
             'overrides_applied': overrides_applied,
             'raw_mars_data': mars_data
         }
@@ -444,7 +505,6 @@ def predict_landing_suitability():
         return jsonify(response)
         
     except Exception as e:
-        import traceback
         error_trace = traceback.format_exc()
         _log_error(f"Error in prediction: {e}\n{error_trace}")
         return jsonify({
@@ -464,7 +524,6 @@ def internal_error(error):
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    import traceback
     error_trace = traceback.format_exc()
     _log_error(f"Unhandled exception: {e}\n{error_trace}")
     return jsonify({
@@ -495,7 +554,11 @@ def get_model_info():
 @app.route('/')
 def index():
     """Serve the main frontend HTML page"""
-    return send_file(os.path.join(FRONTEND_DIR, 'index.html'))
+    return send_file(
+        os.path.join(FRONTEND_DIR, 'index.html'),
+        max_age=0,
+        conditional=False,
+    )
 
 @app.route('/<path:path>')
 def serve_frontend(path):
@@ -535,7 +598,14 @@ def serve_frontend(path):
             mimetype, _ = mimetypes.guess_type(file_path)
         
         _log_debug(f"Serving static: {path}")
-        return send_file(file_path, mimetype=mimetype)
+        # Avoid stale module/HTML/rasters during local iteration on the globe UI.
+        max_age = 0 if path.lower().endswith((".html", ".js", ".tif", ".tiff")) else None
+        return send_file(
+            file_path,
+            mimetype=mimetype,
+            max_age=max_age,
+            conditional=False if max_age == 0 else True,
+        )
     
     # If it's a directory, try to serve index.html from it (for SPA routing)
     if os.path.isdir(file_path):

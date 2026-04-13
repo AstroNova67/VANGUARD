@@ -24,4 +24,7 @@ venv-api/
 
 node_modules/
 
+# Large aligned Mars GeoTIFFs (scripts/align_mars_input_layers.py)
+scripts/aligned_layers/*.tif
+
 .env

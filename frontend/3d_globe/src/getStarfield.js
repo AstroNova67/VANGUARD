@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export default function getStarfield({ numStars = 500, sprite } = {}) {
+export default function getStarfield({ numStars = 500 } = {}) {
   function randomSpherePoint() {
     const radius = Math.random() * 25 + 25;
     const u = Math.random();
@@ -19,12 +19,10 @@ export default function getStarfield({ numStars = 500, sprite } = {}) {
   }
   const verts = [];
   const colors = [];
-  const positions = [];
   let col;
   for (let i = 0; i < numStars; i += 1) {
-    let p = randomSpherePoint();
+    const p = randomSpherePoint();
     const { pos, hue } = p;
-    positions.push(p);
     col = new THREE.Color().setHSL(hue, 0.2, Math.random());
     verts.push(pos.x, pos.y, pos.z);
     colors.push(col.r, col.g, col.b);
@@ -36,7 +34,6 @@ export default function getStarfield({ numStars = 500, sprite } = {}) {
     size: 0.2,
     vertexColors: true,
     fog: false,
-    // map: sprite,
   });
   const points = new THREE.Points(geo, mat);
   return points;

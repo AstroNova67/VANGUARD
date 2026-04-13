@@ -15,10 +15,12 @@ The **3D globe** loads **bundled GeoTIFFs** under `frontend/3d_globe/public/data
 |--------|--------|----------------|
 | **Client** | `frontend/3d_globe/index.js` | Click → lat/lon → each registered GeoTIFF is sampled at that point → JSON body (`elevation`, `slope`, `temperature`, `thermalInertia`, `ferric`, …). |
 | **Inference inputs** | `backend/scoring.py` → `map_mars_data_to_features` | Turns that JSON into scaled feature vectors per model (same file also runs inverse transforms on raw NN outputs). |
-| **Models** | `backend/app.py` | Loads saved Keras + XGB checkpoints from `saved_models/`; runs predictions; **fuses** surface temp / thermal inertia for scoring (`_fuse_*_for_score` in `app.py`). |
-| **Landing %** | `backend/scoring.py` → `LandingSuitabilityScorer` | Combines the five fused predictions with fixed weights (see `LANDING_SCORING_SOURCES.md`). |
+| **Models** | `backend/app.py` | Loads saved Keras + XGB checkpoints from `saved_models/`; runs all heads for transparency; **raster-first** per scored property (see `data_sources` in the response). |
+| **Landing %** | `backend/scoring.py` → `LandingSuitabilityScorer` | Combines the five property values (observed where valid, else ML) with fixed weights (see `LANDING_SCORING_SOURCES.md`). |
 
-**Trained ML weights:** Checkpoints under `saved_models/` come from the `backend/*_predictor.py` training scripts and are unchanged by the landing-score rubric. The only issue that was fixed was **live inference mapping** in `map_mars_data_to_features` (`scoring.py`): the surface-temperature NN/XGB must receive **dayside thermal inertia** in input slot 3, filled from **`thermalInertia`** in the JSON—matching training. **Fusion** (which NN vs XGB value to use) still lives in **`backend/app.py`**. No model retrain was required for that fix.
+**Trained ML weights:** Checkpoints under `saved_models/` come from the `backend/*_predictor.py` training scripts and are unchanged by the landing-score rubric. **`map_mars_data_to_features`** (`scoring.py`) still maps JSON into model inputs; the surface-temperature NN/XGB **input** slot 3 uses **`thermalInertia`** (TES dayside TI), matching training. **Gap-fill:** when a scored property has **no valid raster sample** in the request, `backend/app.py` uses ML for that property. For **surface temperature** and **thermal inertia** only, if the corresponding raster is missing, **`_fuse_*_for_score`** in `app.py` keeps the prior **NN vs XGB** choice among model outputs (no raster substitution in that branch). **`data_sources`** in the JSON states, per property, whether the value that entered the rubric was **`raster`** or **`ml_predicted`**.
+
+**Publication / provenance:** `data_sources` answers “why use ML when you have data?”—when a layer is valid at the click, the score uses that observation; ML appears only for gap-fill (or for NN/XGB disambiguation when those two rasters are absent).
 
 ## Objectives
 
@@ -40,14 +42,14 @@ The **3D globe** loads **bundled GeoTIFFs** under `frontend/3d_globe/public/data
 ### 3D Visualization
 - **Interactive 3D globe** (Three.js): orbit controls, optional sun lighting
 - **Per-click GeoTIFF sampling**: each registered layer is read at the clicked point (elevation, slope, temperature, etc.); values appear as a text list in the side panel
-- **Landing prediction panel**: after **Predict landing suitability**, shows **landing %**, a **three-column** table (**Observed (raster)** vs **Neural networks** vs **Regression (XGBoost)**), fusion footnotes, optional **Δ** badges where a raster value exists for that row, and an expandable **raw JSON** payload
+- **Landing prediction panel**: after **Predict landing suitability**, shows **landing %**, a **three-column** table (**Observed (raster)** vs **Neural networks** vs **Regression (XGBoost)**), **Raster / Neural / XGB “in score”** tags driven by **`data_sources`**, footnotes for raster-first + ML gap-fill, optional **Δ** badges, and an expandable **raw JSON** payload
 
 ### Web Interface (what the app actually shows)
 - **Point-and-click** on the globe → numeric **raster-derived** properties for that location
 - **One-button** call to `POST /predict` (same origin as the page when you use the Flask server below)
 - **No separate charting dashboard** in the globe UI (no built-in plots); exploration is tabular / text plus the 3D view
 
-**Observed column:** Raster values in the prediction table mirror fields in the JSON body to `/predict`. **Dust (observed)** uses the **OMEGA ferric/dust** raster (`omega_ferric_nnphs.tif`): the same sampled value is sent as **`ferric`** (model input) and duplicated as **`dustObserved`** for the table. **Slope** and **surface temperature** come from the MOLA/HRSC slope and yearly-average temperature GeoTIFFs. **Thermal inertia (observed)** is sampled from **TES dayside thermal inertia (Putzig et al. 2007)** (`tes_dayside_ti_putzig_2007.tif`); the API uses `thermalInertia` when present to choose **neural vs XGB** for the score (see fusion paragraph under **Landing Suitability Prediction**). **Water (observed)** is **Odyssey GRS** weight percent (`mars_odyssey_grs_mons_perc_wt.tif`, field `grsWaterWt`)—illustrative vs the neural water output; definitions may differ from training targets.
+**Observed column:** Raster values in the prediction table mirror fields in the JSON body to `/predict`. When those fields are valid, **the same numbers can feed the landing % directly** (see **`data_sources`**). **Dust (scored from raster)** uses the **OMEGA ferric/dust** index (`ferric` in JSON; same as **`dustObserved`** in the table). The scorer’s dust band was tuned for NN outputs (~0.6–0.7); using raw ferric for the dust term is intentional for “observed first” behavior but may sit outside that normalization band—treat as a known limitation unless you add calibration. **Slope**, **yearly-average surface temperature** (`temperature`), **TES dayside TI** (`thermalInertia`), and **GRS water** (`grsWaterWt`) follow the same raster-first rule when finite and present.
 
 ## 🚀 Quick Start
 
@@ -216,6 +218,7 @@ VANGUARD/
 │   ├── thermal_inertia_predictor.py  # Thermal inertia model
 │   ├── water_predictor.py     # Water content prediction model
 │   ├── scoring.py             # Landing suitability scoring system
+│   ├── batch_global_landing_suitability.py  # Global suitability GeoTIFF (raster-first)
 │   └── app.py                 # Flask API server
 ├── frontend/
 │   ├── 3d_globe/              # Interactive 3D Mars visualization
@@ -236,7 +239,7 @@ The Flask API provides the following endpoints:
 
 ### Landing Suitability Prediction
 
-The main endpoint runs the neural property models, runs **XGBoost** for **surface temperature** and **thermal inertia** (when model files load), **fuses** temperature and thermal inertia for scoring (see fusion paragraph below), then computes **`landing_score`** via `LandingSuitabilityScorer`.
+The main endpoint always runs the five neural heads and **XGBoost** for surface temperature and thermal inertia (when model files load) so the response can show model-vs-observed comparisons. It then builds the **five values that enter `LandingSuitabilityScorer`**: for each property, **use the raster sample when valid**, otherwise **ML** (for surface temperature and thermal inertia only, ML means the existing **NN vs XGB fusion** when those rasters are missing). The response includes **`data_sources`** (`raster` vs `ml_predicted`) per property.
 
 **Request:**
 ```json
@@ -260,17 +263,19 @@ The main endpoint runs the neural property models, runs **XGBoost** for **surfac
 }
 ```
 
-Optional / UI-driven fields: `thermalInertia` (TES dayside Putzig 2007 raster at the click) and `grsWaterWt` (Odyssey GRS % wt) are **passed through** for the **Observed** column and `raw_mars_data`. **Landing score** uses **both** predicted surface temperature **and** predicted thermal inertia as separate weighted terms (20% each in `LandingSuitabilityScorer`).
+Optional / UI-driven fields: `thermalInertia`, `temperature`, `slope`, `ferric`, `grsWaterWt`, etc., are echoed in `raw_mars_data`. **Landing score** uses each of the five rubric inputs from **raster-first** logic: valid **`temperature`** → scored surface temp is observed °C; valid **`thermalInertia`** → scored TI is observed; same for **`slope`**, **`ferric`** (dust term), **`grsWaterWt`** (water term).
 
-For **surface-temperature** NN/XGB, the five **inputs** are built in `map_mars_data_to_features` (`scoring.py`). The **third** column matches training (**dayside thermal inertia**), so the JSON field **`thermalInertia`** fills that slot. The **`temperature`** field (yearly average °C from its GeoTIFF) is **not** that third input; it is still used for **fusion** in `app.py` (closest to observed °C) and as an input to other heads where the feature map uses `temperature`. **`thermalInertia`** is also used for **TI fusion** when present. **`grsWaterWt`** is **not** an input to the neural nets in `map_mars_data_to_features`. **`dustObserved`** duplicates **`ferric`** for display only.
+For **surface-temperature** NN/XGB **inputs**, the five **features** are built in `map_mars_data_to_features` (`scoring.py`). The **third** feature is **dayside thermal inertia**, from **`thermalInertia`** in JSON. The **`temperature`** field is **not** that third input; it is the yearly average used for **scoring when valid**, and still feeds other model heads as today. **`grsWaterWt`** is not a neural-net input in `map_mars_data_to_features`. **`dustObserved`** duplicates **`ferric`** for display only.
 
-**API-only callers:** Include **`thermalInertia`** in the POST body whenever possible so the surface-temperature models receive the same third input as training (the globe does this automatically). If it is omitted, inference uses a default for that slot—prefer always sending TI for serious use.
+**API-only callers:** Include **`thermalInertia`** whenever possible so NN/XGB **inputs** match training (the globe does this automatically). Raster-first scoring still benefits from complete JSON so each property can resolve to `raster` in **`data_sources`**.
 
 **Response (illustrative numbers):**
 
-- `predictions.neural_networks` — **fused** property bundle **used for `landing_score`** (same key name as before; not “NN-only”).
-- `predictions.neural_networks_baseline` — **neural nets only** (no temperature/TI substitution from XGB).
+- `predictions.neural_networks` — **final property bundle used for `landing_score`** (same key name as before; values may be observed or ML).
+- `predictions.neural_networks_baseline` — **neural nets only** (always model outputs).
 - `predictions.regression_models` — raw XGB outputs (`surface_temp_xgb`, `thermal_inertia_xgb`).
+- `data_sources` — per property (`slope`, `dust`, `surface_temp`, `thermal_inertia`, `water`): **`raster`** or **`ml_predicted`** for what entered the rubric.
+- `overrides_applied` — when temp/TI use **ML**, which head won (**`surface_temp_xgb`** / **`surface_temp_nn`**, etc.); omitted when that property used a raster for scoring.
 - `raw_mars_data` — **echo of the full request JSON** the server received (not truncated in real responses).
 
 ```json
@@ -279,10 +284,10 @@ For **surface-temperature** NN/XGB, the five **inputs** are built in `map_mars_d
   "landing_score": 78.5,
   "predictions": {
     "neural_networks": {
-      "slope": 2.1,
-      "dust": 0.15,
-      "surface_temp": -42.3,
-      "thermal_inertia": 450.2,
+      "slope": 2.34,
+      "dust": 0.23,
+      "surface_temp": -45.23,
+      "thermal_inertia": 412.0,
       "water": 3.5
     },
     "neural_networks_baseline": {
@@ -297,10 +302,14 @@ For **surface-temperature** NN/XGB, the five **inputs** are built in `map_mars_d
       "thermal_inertia_xgb": 445.2
     }
   },
-  "overrides_applied": {
-    "surface_temp": "surface_temp_xgb",
-    "thermal_inertia": "thermal_inertia_xgb"
+  "data_sources": {
+    "slope": "raster",
+    "dust": "raster",
+    "surface_temp": "raster",
+    "thermal_inertia": "raster",
+    "water": "ml_predicted"
   },
+  "overrides_applied": {},
   "raw_mars_data": {
     "lat": 15.23,
     "lon": -45.67,
@@ -322,7 +331,9 @@ For **surface-temperature** NN/XGB, the five **inputs** are built in `map_mars_d
 }
 ```
 
-**Fusion for the landing score:** `predictions.neural_networks` is the fused bundle used by `LandingSuitabilityScorer`. For **surface temperature**, if the request includes a numeric `temperature` (raster input from the globe), the API picks **neural vs XGB** whichever is closer to that value among physically plausible predictions; if `temperature` is missing, it keeps the previous rule (prefer XGB when its prediction is in \[-200, 50\] °C). For **thermal inertia**, the same “closest to observed” rule applies when the client sends numeric **`thermalInertia`** or **`thermal_inertia`** (the bundled globe now samples **Putzig 2007 TES dayside TI** into `thermalInertia`); if neither is sent, XGB is used when its value is in \[50, 2000\], else neural. `overrides_applied` values include `surface_temp_xgb` / `surface_temp_nn` and `thermal_inertia_xgb` / `thermal_inertia_nn` to indicate which source was chosen for the score (omitted when the default path uses neural-only for that field and no explicit choice is recorded).
+**Raster-first and fusion:** `predictions.neural_networks` is what `LandingSuitabilityScorer` receives. If **`temperature`** is a valid observation, that value is used for the **surface temperature** term and **`data_sources.surface_temp`** is **`raster`**; **NN vs XGB fusion for that property runs only when `temperature` is missing or non-finite** (same pattern for **`thermalInertia`** / **`thermal_inertia`**). In the ML-only branches, `_fuse_*_for_score` in `app.py` is unchanged (XGB vs NN among model outputs). **`overrides_applied`** records NN vs XGB for temp/TI only when **`data_sources`** for that property is **`ml_predicted`**.
+
+**Global batch GeoTIFF** (`backend/batch_global_landing_suitability.py`): Reads the 13-band stack **`mars_global_input_stack_32ppd.tif`** (`--input`; never modified). By default writes only **`mars_landing_suitability_ml.tif`** (`--output`). Pass **`--with-hybrid-coverage`** to also write hybrid + **`mars_ml_coverage.tif`** (see `--hybrid-output` / `--coverage-output`). Regenerate ML map: `uv run python backend/batch_global_landing_suitability.py`.
 
 ### Landing Score Interpretation
 
@@ -361,6 +372,7 @@ response = requests.post('http://localhost:5002/predict', json={
 
 result = response.json()
 print(f"Landing Score: {result['landing_score']}%")
+print(f"Data sources: {result.get('data_sources')}")
 print(f"Predictions: {result['predictions']}")
 ```
 
