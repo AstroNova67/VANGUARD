@@ -229,67 +229,124 @@
         display: block;
       }
 
-      .landing-overlay-legend__title {
+      /* Shared map key: heading → lede → optional source line → ramp (JS fills gradient) → footnote */
+      .map-legend {
+        margin: 0;
+        padding: 0;
+      }
+
+      .map-legend__heading {
+        margin: 0 0 6px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: none;
+        color: #d4e8f5;
+        line-height: 1.35;
+      }
+
+      .map-legend__lede {
         margin: 0 0 8px;
         font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #8eb8d8;
-      }
-
-      .landing-overlay-legend__subtitle {
-        margin: -4px 0 8px;
-        font-size: 10px;
-        line-height: 1.4;
+        line-height: 1.45;
         font-weight: 500;
-        text-transform: none;
-        letter-spacing: normal;
-        color: #7a9aad;
-      }
-
-      .landing-overlay-legend__bar {
-        height: 14px;
-        width: 100%;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        /* Background set in JS (`landingSuitabilityLegendGradientCss`) to match globe tint */
-        min-height: 14px;
-      }
-
-      .landing-overlay-legend__ticks {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 6px;
-        font-size: 10px;
-        font-variant-numeric: tabular-nums;
         color: #9bb8cc;
       }
 
-      .landing-overlay-legend__ticks span {
-        max-width: 32%;
-        line-height: 1.25;
+      .map-legend__source {
+        margin: 0 0 10px;
+        font-size: 10px;
+        line-height: 1.4;
+        color: #7a95aa;
       }
 
-      .landing-overlay-legend__ticks span:last-child {
-        text-align: right;
+      .map-legend__source-label {
+        display: block;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #5d7a8e;
+        margin-bottom: 2px;
       }
 
-      .landing-overlay-legend__note {
-        margin: 8px 0 0;
+      .map-legend__source code {
+        font-size: 10px;
+        color: #b8d4ea;
+        word-break: break-all;
+      }
+
+      .map-legend__methods {
+        margin: 10px 0 0;
         font-size: 10px;
         line-height: 1.45;
         color: #6d8a9c;
       }
 
-      .landing-overlay-legend__sub {
-        display: inline-block;
+      .legend-ramp {
+        margin: 0;
+      }
+
+      .legend-ramp__bar {
+        height: 18px;
+        width: 100%;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .legend-ramp__scale {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 2px;
+        margin-top: 4px;
+        padding: 0 1px;
+      }
+
+      .legend-ramp__step {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .legend-ramp__step--start {
+        align-items: flex-start;
+        text-align: left;
+      }
+
+      .legend-ramp__step--end {
+        align-items: flex-end;
+        text-align: right;
+      }
+
+      .legend-ramp__nub {
+        display: block;
+        width: 1px;
+        height: 7px;
+        margin-bottom: 3px;
+        background: rgba(255, 255, 255, 0.35);
+        border-radius: 1px;
+      }
+
+      .legend-ramp__num {
+        font-size: 10px;
+        font-weight: 700;
+        color: #c8dce8;
+        line-height: 1.2;
+      }
+
+      .legend-ramp__qual {
+        display: block;
         margin-top: 2px;
         font-size: 9px;
-        font-weight: 500;
-        color: #6d8a9c;
-        text-transform: none;
-        letter-spacing: normal;
+        font-weight: 600;
+        color: #7a9aad;
+        line-height: 1.2;
       }
 
       .globe-surface-card {
@@ -318,16 +375,14 @@
         border-radius: 8px;
       }
 
-      .globe-raster-legend__keyline {
-        margin: 0 0 8px;
-        font-size: 10px;
-        line-height: 1.45;
-        color: #8aaabe;
+      .famous-sites-block {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
       }
 
-      .globe-raster-legend__keyline code {
-        font-size: 10px;
-        color: #c4dff0;
+      .famous-sites-block .overlay-toggle-hint {
+        margin-top: 8px;
       }
 
       .manual-coords {
@@ -556,23 +611,35 @@
       }
 
       .pred-legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 12px;
-        margin-bottom: 12px;
-        padding: 8px 10px;
-        font-size: 10px;
+        list-style: none;
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+        gap: 8px 12px;
+        font-size: 11px;
         line-height: 1.4;
-        color: #6d8a9c;
+        color: #8aa8bc;
         background: rgba(255, 255, 255, 0.04);
         border-radius: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
       }
 
-      .pred-legend span {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
+      .pred-legend__item {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .pred-legend__text {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .pred-legend__text strong {
+        color: #d4e8f5;
+        font-weight: 700;
       }
 
       .pred-legend-dot {
@@ -1119,6 +1186,17 @@
             on first use).</span
           >
         </div>
+        <div class="famous-sites-block" aria-label="Famous Mars locations">
+          <p class="manual-coords-title">Famous locations</p>
+          <label class="globe-surface-label" for="famousMarsSite">Jump to a site</label>
+          <select id="famousMarsSite" class="globe-surface-select" aria-label="Famous Mars location presets">
+            <option value="">— Select a landing or science site —</option>
+          </select>
+          <p class="overlay-toggle-hint">
+            Fills latitude / longitude, frames the globe, and loads rasters at that point so you can run landing
+            suitability.
+          </p>
+        </div>
         <div class="manual-coords" aria-label="Manual coordinates">
           <p class="manual-coords-title">Enter coordinates</p>
           <div class="manual-coords-row">
@@ -1165,9 +1243,19 @@
       </section>
     </div>
 
+    <!--
+      Third-party map / globe API keys (Google Maps JS, Mapbox GL, Cesium ion, etc.):
+      Keys used in the browser are always visible in devtools; treat them as public tokens, not secrets.
+      - Restrict keys in the provider console: HTTP referrer allowlist for web (e.g. https://yourdomain.com/*,
+        http://localhost:* for dev); enable only the APIs you need; use separate keys per app/environment.
+      - Keep billing quotas/alerts on; never commit raw keys—inject at build time or read from server-rendered config.
+      - For secret credentials or heavy usage, proxy requests through your backend instead of the browser.
+      References: https://developers.google.com/maps/api-security-best-practices
+      https://docs.mapbox.com/help/troubleshooting/how-to-use-mapbox-securely/
+    -->
     <!-- Load GeoTIFF as global -->
     <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     <!-- Your Three.js script -->
-    <script type="module" src="index.js?v=15"></script>
+    <script type="module" src="index.js?v=17"></script>
   </body>
 </html>

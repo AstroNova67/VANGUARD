@@ -561,12 +561,24 @@ async function predictLandingSuitability() {
             <p class="pred-lead">Each row shows observed rasters, <strong>Neural</strong> (Keras), and <strong>XGB</strong> (temp &amp; TI). The landing % uses the ML columns only: <strong>Neural · in score</strong> or <strong>XGB · in score</strong> marks which value was used (slope, dust, and water always from Keras here). <strong>Δ</strong> = |model − raster| for comparison.</p>
           </div>
           ${baselineWarn}
-          <div class="pred-legend" role="note" aria-label="Column legend">
-            <span><span class="pred-legend-dot pred-legend-dot--obs" aria-hidden="true"></span> Raster sample</span>
-            <span><span class="pred-legend-dot pred-legend-dot--nn" aria-hidden="true"></span> Neural</span>
-            <span><span class="pred-legend-dot pred-legend-dot--xgb" aria-hidden="true"></span> XGBoost</span>
-            <span><span class="pred-legend-dot pred-legend-dot--score" aria-hidden="true"></span> Amber box + tag = value used in landing %</span>
-          </div>
+          <ul class="pred-legend" role="list" aria-label="Prediction table columns">
+            <li class="pred-legend__item">
+              <span class="pred-legend-dot pred-legend-dot--obs" aria-hidden="true"></span>
+              <span class="pred-legend__text"><strong>Raster</strong> — GeoTIFF sample at the click (observed).</span>
+            </li>
+            <li class="pred-legend__item">
+              <span class="pred-legend-dot pred-legend-dot--nn" aria-hidden="true"></span>
+              <span class="pred-legend__text"><strong>Neural</strong> — Keras outputs for comparison.</span>
+            </li>
+            <li class="pred-legend__item">
+              <span class="pred-legend-dot pred-legend-dot--xgb" aria-hidden="true"></span>
+              <span class="pred-legend__text"><strong>XGB</strong> — Regression where trained (temp &amp; TI).</span>
+            </li>
+            <li class="pred-legend__item">
+              <span class="pred-legend-dot pred-legend-dot--score" aria-hidden="true"></span>
+              <span class="pred-legend__text"><strong>In score</strong> — Amber highlight = value used in landing %.</span>
+            </li>
+          </ul>
           <p class="pred-grid-scroll-hint" role="note">
             <strong>Three columns</strong> (Raster · Neural · XGB). If Neural/XGB look missing, <strong>scroll this table horizontally</strong> — the grid is wider than the sidebar.
           </p>
@@ -748,6 +760,27 @@ const marsDatasets = {
     marsDataKey: "grsWaterWt",
   },
 };
+
+/**
+ * Approximate coordinates (°N latitude, °E longitude, −180…180) for quick landing tests.
+ * Sources: NASA mission landing ellipses and common gazetteer values; not survey-grade.
+ */
+const MARS_FAMOUS_LOCATIONS = [
+  { id: "jezero", name: "Jezero crater (Perseverance)", lat: 18.4447, lon: 77.4508 },
+  { id: "gale", name: "Gale crater (Curiosity)", lat: -5.5892, lon: 137.4417 },
+  { id: "meridiani", name: "Meridiani Planum (Opportunity)", lat: -1.9462, lon: -5.5266 },
+  { id: "gusev", name: "Gusev crater (Spirit)", lat: -14.5689, lon: 175.4726 },
+  { id: "viking1", name: "Viking 1 (Chryse Planitia)", lat: 22.4872, lon: -47.9424 },
+  { id: "viking2", name: "Viking 2 (Utopia Planitia)", lat: 47.967, lon: 134.991 },
+  { id: "insight", name: "Elysium Planitia (InSight)", lat: 4.5024, lon: 135.6234 },
+  { id: "pathfinder", name: "Ares Vallis (Pathfinder)", lat: 19.3278, lon: -33.5441 },
+  { id: "phoenix", name: "Green Valley (Phoenix)", lat: 68.2188, lon: -125.7497 },
+  { id: "olympus", name: "Olympus Mons (caldera)", lat: 18.65, lon: -133.8 },
+  { id: "valles", name: "Valles Marineris (Coprates vicinity)", lat: -14.5, lon: -59.0 },
+  { id: "hellas", name: "Hellas Planitia (basin center)", lat: -42.0, lon: 70.0 },
+  { id: "noctis", name: "Noctis Labyrinthus", lat: -7.0, lon: -97.0 },
+  { id: "ascraeus", name: "Ascraeus Mons", lat: 11.2, lon: -104.1 },
+];
 
 let currentDataset = null;
 let currentDatasetType = 'elevation';
@@ -1129,6 +1162,56 @@ function getLegendGradientCss(layerKey) {
   return `linear-gradient(90deg, ${rgbToCss(a)} 0%, ${rgbToCss(m)} 50%, ${rgbToCss(b)} 100%)`;
 }
 
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Strip cache-bust query/hash so legend titles stay readable. */
+function legendSanitizedBasename(name) {
+  const s = String(name || "").trim();
+  const base = s.split("?")[0].split("#")[0].trim();
+  return base || "mars_landing_suitability_ml.tif";
+}
+
+function buildNumericRampTicks(minV, maxV, count) {
+  const n = Math.max(2, Math.floor(count));
+  const out = [];
+  for (let i = 0; i < n; i += 1) {
+    out.push(minV + ((maxV - minV) * i) / (n - 1));
+  }
+  return out;
+}
+
+function formatLayerTickValue(v, unit) {
+  if (!Number.isFinite(v)) return "—";
+  const u = String(unit || "").trim();
+  const num = Number(v).toFixed(2);
+  return u ? `${num}\u00a0${u}` : num;
+}
+
+/**
+ * @param {{ num: string; qual?: string }[]} steps
+ */
+function legendRampScaleHtml(steps) {
+  return steps
+    .map((s, i) => {
+      const mod =
+        i === 0 ? " legend-ramp__step--start" : i === steps.length - 1 ? " legend-ramp__step--end" : "";
+      const qual =
+        s.qual != null && s.qual !== ""
+          ? `<span class="legend-ramp__qual">${escapeHtml(s.qual)}</span>`
+          : "";
+      return `<div class="legend-ramp__step${mod}"><span class="legend-ramp__nub" aria-hidden="true"></span><span class="legend-ramp__num">${escapeHtml(
+        s.num
+      )}</span>${qual}</div>`;
+    })
+    .join("");
+}
+
 function setGlobeRasterLegendVisible(show, layerKey, minV, maxV) {
   const leg = document.getElementById("globeRasterLegend");
   if (!leg) return;
@@ -1139,23 +1222,31 @@ function setGlobeRasterLegendVisible(show, layerKey, minV, maxV) {
     return;
   }
   const info = marsDatasets[layerKey];
-  const suf = info.unit ? ` ${info.unit}` : "";
-  const fmt = (v) => (Number.isFinite(v) ? Number(v).toFixed(2) : "—") + suf;
+  const unit = (info.unit || "").trim();
+  const ticks = buildNumericRampTicks(minV, maxV, 5);
+  const steps = ticks.map((v) => ({ num: formatLayerTickValue(v, unit) }));
   const gradient = getLegendGradientCss(layerKey);
+  const title = unit ? `${info.name} (${unit})` : info.name;
+  const ariaRange = `Color scale for ${info.name} from ${formatLayerTickValue(minV, unit)} to ${formatLayerTickValue(
+    maxV,
+    unit
+  )}`;
   leg.innerHTML = `
-    <p class="landing-overlay-legend__title">${info.name}</p>
-    <p class="globe-raster-legend__keyline"><code>${info.marsDataKey}</code> — ${info.description}</p>
-    <div class="landing-overlay-legend__bar" role="img" aria-label="Color scale for ${info.name}" style="background:${gradient}"></div>
-    <div class="landing-overlay-legend__ticks">
-      <span>${fmt(minV)}<br /><span class="landing-overlay-legend__sub">low</span></span>
-      <span style="text-align:center">${fmt(minV + (maxV - minV) * 0.5)}<br /><span class="landing-overlay-legend__sub">mid</span></span>
-      <span>${fmt(maxV)}<br /><span class="landing-overlay-legend__sub">high</span></span>
-    </div>
-    <p class="landing-overlay-legend__note">
-      Scale uses min/max from a strided sample of the raster (not full precision). No-data pixels keep the base photo.
-      Tint is blended ~55% with <code>textures/mars_8k.jpg</code>.
-    </p>
-  `;
+    <div class="map-legend" role="group" aria-labelledby="globe-raster-legend-h">
+      <h3 class="map-legend__heading" id="globe-raster-legend-h">${escapeHtml(title)}</h3>
+      <p class="map-legend__lede">${escapeHtml(info.description)}</p>
+      <p class="map-legend__source"><span class="map-legend__source-label">API / JSON field</span><code>${escapeHtml(
+        info.marsDataKey
+      )}</code></p>
+      <div class="legend-ramp" role="img" aria-label="${escapeHtml(ariaRange)}">
+        <div class="legend-ramp__bar" style="background:${gradient}"></div>
+        <div class="legend-ramp__scale" aria-hidden="true">${legendRampScaleHtml(steps)}</div>
+      </div>
+      <p class="map-legend__methods">
+        Tick values are min–max from a strided sample (fast preview, not full-tile statistics). No-data leaves the base
+        photo. Globe tint is ~55% blended with the Mars photo texture.
+      </p>
+    </div>`;
   leg.classList.add("is-visible");
   leg.setAttribute("aria-hidden", "false");
 }
@@ -1394,19 +1485,30 @@ function setLandingOverlayLegend(mode, overlayBasename) {
     leg.innerHTML = "";
     return;
   }
-  const fn = overlayBasename || "mars_landing_suitability_ml.tif";
+  const displayFile = legendSanitizedBasename(overlayBasename || "mars_landing_suitability_ml.tif");
+  const steps = [
+    { num: "0%", qual: "Poor" },
+    { num: "25%", qual: "Fair" },
+    { num: "50%", qual: "Mid" },
+    { num: "75%", qual: "Good" },
+    { num: "100%", qual: "High" },
+  ];
   leg.innerHTML = `
-      <p class="landing-overlay-legend__title"><code>${fn}</code> — ML global suitability</p>
-      <p class="landing-overlay-legend__subtitle">0–100% landing suitability (heatmap ramp).</p>
-      <div class="landing-overlay-legend__bar" role="img" aria-label="Color scale from low to high" style="background:${landingSuitabilityLegendGradientCss()}"></div>
-      <div class="landing-overlay-legend__ticks">
-        <span>0%<br /><span class="landing-overlay-legend__sub">Poor</span></span>
-        <span style="text-align: center">50%<br /><span class="landing-overlay-legend__sub">Mid</span></span>
-        <span>100%<br /><span class="landing-overlay-legend__sub">High</span></span>
+    <div class="map-legend map-legend--suitability" role="group" aria-labelledby="landing-ml-legend-h">
+      <h3 class="map-legend__heading" id="landing-ml-legend-h">Landing suitability (ML)</h3>
+      <p class="map-legend__lede">
+        Same ramp as the globe overlay: 0–100% model score. Use labels for exact bins; hue is a quick visual guide (not
+        the only encoding).
+      </p>
+      <p class="map-legend__source"><span class="map-legend__source-label">GeoTIFF file</span><code>${escapeHtml(
+        displayFile
+      )}</code></p>
+      <div class="legend-ramp" role="img" aria-label="Suitability from 0 percent poor to 100 percent high">
+        <div class="legend-ramp__bar" style="background:${landingSuitabilityLegendGradientCss()}"></div>
+        <div class="legend-ramp__scale" aria-hidden="true">${legendRampScaleHtml(steps)}</div>
       </div>
-      <p class="landing-overlay-legend__note">
-        <code>mars_landing_suitability_ml.tif</code> (0–100%). No-data (−9999) not tinted.
-      </p>`;
+      <p class="map-legend__methods">No-data (−9999) is not tinted; those pixels show the underlying Mars photograph.</p>
+    </div>`;
 }
 
 /** @returns {"off" | "mlSuitability"} */
@@ -1666,6 +1768,31 @@ async function onApplyManualLatLon() {
   await populateMarsReadingsAtLatLon(parsed.lat, parsed.lon, null);
 }
 
+function initFamousMarsSitesSelect() {
+  const sel = document.getElementById("famousMarsSite");
+  if (!sel) return;
+  for (const loc of MARS_FAMOUS_LOCATIONS) {
+    const opt = document.createElement("option");
+    opt.value = loc.id;
+    opt.textContent = loc.name;
+    opt.dataset.lat = String(loc.lat);
+    opt.dataset.lon = String(loc.lon);
+    sel.appendChild(opt);
+  }
+  sel.addEventListener("change", async () => {
+    const opt = sel.selectedOptions[0];
+    if (!opt?.dataset.lat || !opt.dataset.lon) return;
+    const lat = Number(opt.dataset.lat);
+    const lon = Number(opt.dataset.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const fb = document.getElementById("manualCoordsFeedback");
+    if (fb) fb.textContent = "";
+    frameCameraOnMarsLatLon(lat, lon);
+    await populateMarsReadingsAtLatLon(lat, lon, null);
+    sel.value = "";
+  });
+}
+
 // --- Mouse Click Handler ---
 async function onMouseClick(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -1686,6 +1813,8 @@ async function onMouseClick(event) {
 }
 
 window.addEventListener("click", onMouseClick, false);
+
+initFamousMarsSitesSelect();
 
 document.getElementById("applyManualLatLon")?.addEventListener("click", () => {
   void onApplyManualLatLon();
