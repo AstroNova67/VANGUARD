@@ -1,0 +1,723 @@
+✅ Loaded 8 scalers and transformers
+{
+  "task1": [
+    {
+      "band": 1,
+      "name": "elevation",
+      "basename": "MOLA_128ppd_topo.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/scripts/derived_layers/MOLA_128ppd_topo_fullres.tif",
+      "original_dims": "46080\u00d723040",
+      "native_ppd": 128.0,
+      "factor_to_32ppd": 0.25,
+      "direction": "downsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 36.533972,
+      "mean_diff_4px": 117.050237,
+      "blockiness_ratio": 0.3121,
+      "blocky": false
+    },
+    {
+      "band": 2,
+      "name": "slope",
+      "basename": "mola_hrsc_blend_slope_v2.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mola_hrsc_blend_slope_v2.tif",
+      "original_dims": "11520\u00d75760",
+      "native_ppd": 32.0,
+      "factor_to_32ppd": 1.0,
+      "direction": "none",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": "Source already 32 PPD on disk \u2014 alignment may have been done in-place.",
+      "mean_diff_1px": 0.794682,
+      "mean_diff_4px": 1.656618,
+      "blockiness_ratio": 0.4797,
+      "blocky": false
+    },
+    {
+      "band": 3,
+      "name": "roughness",
+      "basename": "mola_roughness_0.6km_numeric.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mola_roughness_0.6km_numeric.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.26355,
+      "mean_diff_4px": 1.054712,
+      "blockiness_ratio": 0.2499,
+      "blocky": false
+    },
+    {
+      "band": 4,
+      "name": "albedo",
+      "basename": "omega_albedo_r1080.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/omega_albedo_r1080.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.000289,
+      "mean_diff_4px": 0.001122,
+      "blockiness_ratio": 0.2572,
+      "blocky": false
+    },
+    {
+      "band": 5,
+      "name": "temperature",
+      "basename": "mars_yearly_avg_temperature_celsius.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mars_yearly_avg_temperature_celsius.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.008748,
+      "mean_diff_4px": 0.034984,
+      "blockiness_ratio": 0.2501,
+      "blocky": false
+    },
+    {
+      "band": 6,
+      "name": "tempRange",
+      "basename": "mars_yearly_temperature_range_v1.0.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mars_yearly_temperature_range_v1.0.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.033206,
+      "mean_diff_4px": 0.132525,
+      "blockiness_ratio": 0.2506,
+      "blocky": false
+    },
+    {
+      "band": 7,
+      "name": "crustalThickness",
+      "basename": "mars_crustal_thickness_gmm3_rm1.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mars_crustal_thickness_gmm3_rm1.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.001239,
+      "mean_diff_4px": 0.004952,
+      "blockiness_ratio": 0.2502,
+      "blocky": false
+    },
+    {
+      "band": 8,
+      "name": "ferric",
+      "basename": "omega_ferric_nnphs.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/omega_ferric_nnphs.tif",
+      "original_dims": "6136\u00d73096",
+      "native_ppd": 17.04,
+      "factor_to_32ppd": 1.88,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.002958,
+      "mean_diff_4px": 0.009993,
+      "blockiness_ratio": 0.296,
+      "blocky": false
+    },
+    {
+      "band": 9,
+      "name": "pyroxene",
+      "basename": "omega_pyroxene_bd2000.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/omega_pyroxene_bd2000.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.000185,
+      "mean_diff_4px": 0.000715,
+      "blockiness_ratio": 0.2594,
+      "blocky": false
+    },
+    {
+      "band": 10,
+      "name": "basalt",
+      "basename": "TES_Basalt_numeric.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/TES_Basalt_numeric.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.14752,
+      "mean_diff_4px": 0.589935,
+      "blockiness_ratio": 0.2501,
+      "blocky": false
+    },
+    {
+      "band": 11,
+      "name": "lambertAlbedo",
+      "basename": "TES_Lambert_Albedo_numeric.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/TES_Lambert_Albedo_numeric.tif",
+      "original_dims": "1214\u00d7562",
+      "native_ppd": 3.37,
+      "factor_to_32ppd": 9.49,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.000111,
+      "mean_diff_4px": 0.000446,
+      "blockiness_ratio": 0.2495,
+      "blocky": false
+    },
+    {
+      "band": 12,
+      "name": "thermalInertia",
+      "basename": "tes_dayside_ti_putzig_2007.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/tes_dayside_ti_putzig_2007.tif",
+      "original_dims": "6140\u00d73096",
+      "native_ppd": 17.06,
+      "factor_to_32ppd": 1.88,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 7.775182,
+      "mean_diff_4px": 23.075448,
+      "blockiness_ratio": 0.3369,
+      "blocky": false
+    },
+    {
+      "band": 13,
+      "name": "grsWaterWt",
+      "basename": "mars_odyssey_grs_mons_perc_wt.tif",
+      "source_path": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mars_odyssey_grs_mons_perc_wt.tif",
+      "original_dims": "3068\u00d71548",
+      "native_ppd": 8.52,
+      "factor_to_32ppd": 3.75,
+      "direction": "upsample",
+      "resampling": "bilinear (align_mars_input_layers.py default)",
+      "note": null,
+      "mean_diff_1px": 0.100312,
+      "mean_diff_4px": 0.405166,
+      "blockiness_ratio": 0.2476,
+      "blocky": false
+    }
+  ],
+  "task2": {
+    "slope": {
+      "pct_outside": 0.0,
+      "pct_clamped_0": 0.0,
+      "pct_clamped_1": 0.0,
+      "flag_gt_10pct_clamped": false
+    },
+    "dust": {
+      "pct_outside": 100.0,
+      "pct_clamped_0": 100.0,
+      "pct_clamped_1": 0.0,
+      "flag_gt_10pct_clamped": true
+    },
+    "surface_temp": {
+      "pct_outside": 7.268,
+      "pct_clamped_0": 0.0,
+      "pct_clamped_1": 7.268,
+      "flag_gt_10pct_clamped": false
+    },
+    "thermal_inertia": {
+      "pct_outside": 53.032,
+      "pct_clamped_0": 53.032,
+      "pct_clamped_1": 0.0,
+      "flag_gt_10pct_clamped": true
+    },
+    "water": {
+      "pct_outside": 11.892,
+      "pct_clamped_0": 11.892,
+      "pct_clamped_1": 0.0,
+      "flag_gt_10pct_clamped": true
+    }
+  },
+  "task3": {
+    "slope": {
+      "n_valid": 50000,
+      "mean_delta": 1.5689,
+      "std_delta": 2.4769,
+      "p95_delta": 6.1366,
+      "max_delta": 34.0239,
+      "anomalies_3sigma": 1860,
+      "pct_anomalies_3sigma": 3.72,
+      "top5_hotspot_tiles": [
+        {
+          "rank": 1,
+          "lon_min": -90,
+          "lon_max": -80,
+          "lat_min": -10,
+          "lat_max": 0,
+          "mean_delta": 6.7128,
+          "n": 76
+        },
+        {
+          "rank": 2,
+          "lon_min": -100,
+          "lon_max": -90,
+          "lat_min": -10,
+          "lat_max": 0,
+          "mean_delta": 6.4574,
+          "n": 80
+        },
+        {
+          "rank": 3,
+          "lon_min": -60,
+          "lon_max": -50,
+          "lat_min": -60,
+          "lat_max": -50,
+          "mean_delta": 5.9652,
+          "n": 85
+        },
+        {
+          "rank": 4,
+          "lon_min": -50,
+          "lon_max": -40,
+          "lat_min": -20,
+          "lat_max": -10,
+          "mean_delta": 5.8661,
+          "n": 74
+        },
+        {
+          "rank": 5,
+          "lon_min": -80,
+          "lon_max": -70,
+          "lat_min": -10,
+          "lat_max": 0,
+          "mean_delta": 5.1692,
+          "n": 81
+        }
+      ]
+    },
+    "dust": {
+      "n_valid": 50000,
+      "mean_delta": 0.1244,
+      "std_delta": 0.2918,
+      "p95_delta": 1.0,
+      "max_delta": 1.0,
+      "anomalies_3sigma": 4887,
+      "pct_anomalies_3sigma": 9.774,
+      "top5_hotspot_tiles": [
+        {
+          "rank": 1,
+          "lon_min": 90,
+          "lon_max": 100,
+          "lat_min": -80,
+          "lat_max": -70,
+          "mean_delta": 1.0,
+          "n": 78
+        },
+        {
+          "rank": 2,
+          "lon_min": 160,
+          "lon_max": 170,
+          "lat_min": -90,
+          "lat_max": -80,
+          "mean_delta": 1.0,
+          "n": 55
+        },
+        {
+          "rank": 3,
+          "lon_min": 100,
+          "lon_max": 110,
+          "lat_min": -80,
+          "lat_max": -70,
+          "mean_delta": 1.0,
+          "n": 68
+        },
+        {
+          "rank": 4,
+          "lon_min": 100,
+          "lon_max": 110,
+          "lat_min": -90,
+          "lat_max": -80,
+          "mean_delta": 1.0,
+          "n": 84
+        },
+        {
+          "rank": 5,
+          "lon_min": 110,
+          "lon_max": 120,
+          "lat_min": -90,
+          "lat_max": -80,
+          "mean_delta": 1.0,
+          "n": 87
+        }
+      ]
+    },
+    "surface_temp": {
+      "n_valid": 50000,
+      "mean_delta": 11.9951,
+      "std_delta": 5.6557,
+      "p95_delta": 20.0435,
+      "max_delta": 47.0848,
+      "anomalies_3sigma": 8159,
+      "pct_anomalies_3sigma": 16.318,
+      "top5_hotspot_tiles": [
+        {
+          "rank": 1,
+          "lon_min": -140,
+          "lon_max": -130,
+          "lat_min": -90,
+          "lat_max": -80,
+          "mean_delta": 20.2193,
+          "n": 79
+        },
+        {
+          "rank": 2,
+          "lon_min": -150,
+          "lon_max": -140,
+          "lat_min": -60,
+          "lat_max": -50,
+          "mean_delta": 19.6276,
+          "n": 98
+        },
+        {
+          "rank": 3,
+          "lon_min": -180,
+          "lon_max": -170,
+          "lat_min": 0,
+          "lat_max": 10,
+          "mean_delta": 19.5625,
+          "n": 78
+        },
+        {
+          "rank": 4,
+          "lon_min": -20,
+          "lon_max": -10,
+          "lat_min": 50,
+          "lat_max": 60,
+          "mean_delta": 19.5569,
+          "n": 85
+        },
+        {
+          "rank": 5,
+          "lon_min": -160,
+          "lon_max": -150,
+          "lat_min": -60,
+          "lat_max": -50,
+          "mean_delta": 18.7907,
+          "n": 84
+        }
+      ]
+    },
+    "thermal_inertia": {
+      "n_valid": 50000,
+      "mean_delta": 116.4108,
+      "std_delta": 89.327,
+      "p95_delta": 266.3018,
+      "max_delta": 3375.7749,
+      "anomalies_3sigma": 2418,
+      "pct_anomalies_3sigma": 4.836,
+      "top5_hotspot_tiles": [
+        {
+          "rank": 1,
+          "lon_min": -100,
+          "lon_max": -90,
+          "lat_min": 80,
+          "lat_max": 90,
+          "mean_delta": 298.1114,
+          "n": 70
+        },
+        {
+          "rank": 2,
+          "lon_min": -90,
+          "lon_max": -80,
+          "lat_min": 80,
+          "lat_max": 90,
+          "mean_delta": 285.4555,
+          "n": 79
+        },
+        {
+          "rank": 3,
+          "lon_min": -70,
+          "lon_max": -60,
+          "lat_min": 30,
+          "lat_max": 40,
+          "mean_delta": 284.5055,
+          "n": 73
+        },
+        {
+          "rank": 4,
+          "lon_min": -70,
+          "lon_max": -60,
+          "lat_min": 10,
+          "lat_max": 20,
+          "mean_delta": 280.7561,
+          "n": 73
+        },
+        {
+          "rank": 5,
+          "lon_min": -60,
+          "lon_max": -50,
+          "lat_min": 40,
+          "lat_max": 50,
+          "mean_delta": 278.5053,
+          "n": 76
+        }
+      ]
+    },
+    "water": {
+      "n_valid": 50000,
+      "mean_delta": 15.5744,
+      "std_delta": 24.3711,
+      "p95_delta": 92.0,
+      "max_delta": 100.0,
+      "anomalies_3sigma": 3027,
+      "pct_anomalies_3sigma": 6.054,
+      "top5_hotspot_tiles": [
+        {
+          "rank": 1,
+          "lon_min": -90,
+          "lon_max": -80,
+          "lat_min": 40,
+          "lat_max": 50,
+          "mean_delta": 75.8495,
+          "n": 90
+        },
+        {
+          "rank": 2,
+          "lon_min": 40,
+          "lon_max": 50,
+          "lat_min": 40,
+          "lat_max": 50,
+          "mean_delta": 74.6735,
+          "n": 76
+        },
+        {
+          "rank": 3,
+          "lon_min": 90,
+          "lon_max": 100,
+          "lat_min": 40,
+          "lat_max": 50,
+          "mean_delta": 73.883,
+          "n": 72
+        },
+        {
+          "rank": 4,
+          "lon_min": -100,
+          "lon_max": -90,
+          "lat_min": 40,
+          "lat_max": 50,
+          "mean_delta": 72.9689,
+          "n": 76
+        },
+        {
+          "rank": 5,
+          "lon_min": 80,
+          "lon_max": 90,
+          "lat_min": 40,
+          "lat_max": 50,
+          "mean_delta": 72.8079,
+          "n": 72
+        }
+      ]
+    }
+  },
+  "task4": {
+    "seam_reports": [
+      {
+        "type": "lon_cross_seam",
+        "lon": 0,
+        "col": 5760,
+        "max_jump_m": 963.71,
+        "mean_jump_m": 36.43,
+        "p95_jump_m": 132.42
+      },
+      {
+        "type": "lon_cross_seam",
+        "lon": 90,
+        "col": 8640,
+        "max_jump_m": 944.44,
+        "mean_jump_m": 35.37,
+        "p95_jump_m": 145.63
+      },
+      {
+        "type": "lon_cross_seam",
+        "lon": -90,
+        "col": 2880,
+        "max_jump_m": 1626.58,
+        "mean_jump_m": 32.89,
+        "p95_jump_m": 135.25
+      },
+      {
+        "type": "lat_cross_seam",
+        "lat": 44,
+        "row": 1472,
+        "max_jump_m": 1184.58,
+        "mean_jump_m": 35.15,
+        "p95_jump_m": 126.4
+      },
+      {
+        "type": "lat_cross_seam",
+        "lat": -44,
+        "row": 4288,
+        "max_jump_m": 1361.09,
+        "mean_jump_m": 71.39,
+        "p95_jump_m": 314.25
+      },
+      {
+        "type": "lat_cross_seam",
+        "lat": 88,
+        "row": 64,
+        "max_jump_m": 2610.2,
+        "mean_jump_m": 2097.47,
+        "p95_jump_m": 2318.35
+      },
+      {
+        "type": "lat_cross_seam",
+        "lat": -88,
+        "row": 5696,
+        "max_jump_m": 4272.81,
+        "mean_jump_m": 3164.34,
+        "p95_jump_m": 3954.85
+      }
+    ],
+    "max_elevation_jump_m": 4272.81,
+    "discontinuities_present": true
+  },
+  "task5": {
+    "total_pixels": 66355200,
+    "valid_pixels": 66355200,
+    "nodata_pixels": 0,
+    "valid_pct": 100.0,
+    "band_nodata_pct": {
+      "elevation": 0.0,
+      "slope": 0.0,
+      "roughness": 0.0,
+      "albedo": 0.0,
+      "temperature": 0.0,
+      "tempRange": 0.0,
+      "crustalThickness": 0.0,
+      "ferric": 0.0,
+      "pyroxene": 0.0,
+      "basalt": 0.0,
+      "lambertAlbedo": 0.0,
+      "thermalInertia": 0.0,
+      "grsWaterWt": 0.0
+    },
+    "top_latitude_nodata_bands": [
+      {
+        "lat_band": "-90\u00b0 to -80\u00b0",
+        "valid_pct": 100.0,
+        "nodata_pct": 0.0
+      },
+      {
+        "lat_band": "-80\u00b0 to -70\u00b0",
+        "valid_pct": 100.0,
+        "nodata_pct": 0.0
+      },
+      {
+        "lat_band": "-70\u00b0 to -60\u00b0",
+        "valid_pct": 100.0,
+        "nodata_pct": 0.0
+      },
+      {
+        "lat_band": "-60\u00b0 to -50\u00b0",
+        "valid_pct": 100.0,
+        "nodata_pct": 0.0
+      },
+      {
+        "lat_band": "-50\u00b0 to -40\u00b0",
+        "valid_pct": 100.0,
+        "nodata_pct": 0.0
+      }
+    ],
+    "largest_nodata_contributor": "elevation"
+  },
+  "task6": {
+    "n_scores_sampled": 3600000,
+    "histogram_bins": [
+      {
+        "range": "0-10",
+        "count": 0,
+        "pct": 0.0
+      },
+      {
+        "range": "10-20",
+        "count": 0,
+        "pct": 0.0
+      },
+      {
+        "range": "20-30",
+        "count": 1409,
+        "pct": 0.04
+      },
+      {
+        "range": "30-40",
+        "count": 679265,
+        "pct": 18.87
+      },
+      {
+        "range": "40-50",
+        "count": 1962630,
+        "pct": 54.52
+      },
+      {
+        "range": "50-60",
+        "count": 914560,
+        "pct": 25.4
+      },
+      {
+        "range": "60-70",
+        "count": 42136,
+        "pct": 1.17
+      },
+      {
+        "range": "70-80",
+        "count": 0,
+        "pct": 0.0
+      },
+      {
+        "range": "80-90",
+        "count": 0,
+        "pct": 0.0
+      },
+      {
+        "range": "90-100",
+        "count": 0,
+        "pct": 0.0
+      }
+    ],
+    "mean": 46.015,
+    "std": 6.44,
+    "median": 45.47,
+    "skew_mean_minus_median": 0.545,
+    "distribution_shape": "right-skewed",
+    "multimodal_peak_bins": [
+      4
+    ],
+    "latitudinal": {
+      "equatorial_abs_lat_le_30": {
+        "mean": 45.754,
+        "std": 6.35,
+        "median": 44.85
+      },
+      "mid_30_to_60": {
+        "mean": 45.806,
+        "std": 6.517,
+        "median": 45.43
+      },
+      "polar_60_to_90": {
+        "mean": 46.487,
+        "std": 6.292,
+        "median": 46.16
+      }
+    }
+  },
+  "elapsed_s": 87.5,
+  "paths": {
+    "stack": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mars_global_input_stack_32ppd.tif",
+    "suitability": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data/mars_landing_suitability_ml.tif"
+  }
+}

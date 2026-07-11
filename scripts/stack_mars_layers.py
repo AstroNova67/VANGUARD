@@ -3,6 +3,9 @@
 Stack the 13 globe input GeoTIFFs into one multiband file (same band order as
 frontend/3d_globe/index.js marsDatasets).
 
+Elevation band uses ``scripts/derived_layers/MOLA_128ppd_topo_fullres_smoothed.tif``
+when present (else ``MOLA_128ppd_topo_fullres.tif``); other layers come from ``--data-dir``.
+
 When every file shares the same width, height, CRS, and affine — including the
 common case of unreferenced exports (no CRS, identity transform) — bands are
 written in order as a single GeoTIFF.
@@ -41,9 +44,37 @@ LAYER_BASENAMES: tuple[str, ...] = (
     "mars_odyssey_grs_mons_perc_wt.tif",
 )
 
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MOLA_GLOBE_BASENAME = "MOLA_128ppd_topo.tif"
+MOLA_FULLRES_BASENAME = "MOLA_128ppd_topo_fullres.tif"
+MOLA_FULLRES_SMOOTHED_BASENAME = "MOLA_128ppd_topo_fullres_smoothed.tif"
+MOLA_FULLRES_PATH = os.path.join(_SCRIPT_DIR, "derived_layers", MOLA_FULLRES_BASENAME)
+MOLA_FULLRES_SMOOTHED_PATH = os.path.join(_SCRIPT_DIR, "derived_layers", MOLA_FULLRES_SMOOTHED_BASENAME)
+
+
+def resolve_mola_fullres_path() -> str:
+    """Prefer seam-smoothed full-res elevation when available."""
+    if os.path.isfile(MOLA_FULLRES_SMOOTHED_PATH):
+        return MOLA_FULLRES_SMOOTHED_PATH
+    return MOLA_FULLRES_PATH
+
+
+def resolve_layer_path(data_dir: str, basename: str) -> str:
+    """Globe layers live in ``data_dir``; elevation uses full-res when aligning from globe exports."""
+    data_path = os.path.join(data_dir, basename)
+    if basename != MOLA_GLOBE_BASENAME:
+        return data_path
+    fullres = resolve_mola_fullres_path()
+    if not os.path.isfile(fullres):
+        return data_path
+    abs_dir = os.path.abspath(data_dir)
+    if abs_dir.endswith(os.path.join("scripts", "aligned_layers")) and os.path.isfile(data_path):
+        return data_path
+    return fullres
+
 
 def _layer_paths(data_dir: str) -> list[str]:
-    return [os.path.join(data_dir, n) for n in LAYER_BASENAMES]
+    return [resolve_layer_path(data_dir, n) for n in LAYER_BASENAMES]
 
 
 def main() -> None:

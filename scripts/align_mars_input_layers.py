@@ -12,6 +12,8 @@ image — see project docs.
 
 Does not modify originals; writes aligned copies under ``scripts/aligned_layers/``
 using the same basenames as ``frontend/3d_globe/index.js`` / ``stack_mars_layers.py``.
+Elevation reads ``scripts/derived_layers/MOLA_128ppd_topo_fullres_smoothed.tif``
+when present (else ``MOLA_128ppd_topo_fullres.tif``); globe uses the 32 PPD copy in ``public/data/``.
 
 Example::
 
@@ -40,6 +42,7 @@ if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
 from stack_mars_layers import LAYER_BASENAMES  # noqa: E402
+from stack_mars_layers import resolve_layer_path  # noqa: E402
 
 DEFAULT_MARS_PROJ = "+proj=longlat +R=3396190 +no_defs"
 
@@ -271,7 +274,7 @@ def main() -> None:
     print(f"Output directory: {args.output_dir}\n")
 
     for i, basename in enumerate(LAYER_BASENAMES, start=1):
-        src_path = os.path.join(args.source_dir, basename)
+        src_path = resolve_layer_path(args.source_dir, basename)
         dst_path = os.path.join(args.output_dir, basename)
         if not os.path.isfile(src_path):
             print(f"error: missing source: {src_path}", file=sys.stderr)

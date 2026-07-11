@@ -60,6 +60,99 @@ def mars_raster_value_for_property(mars_data: dict, property_name: str):
     return None
 
 
+# Research-based defaults (see LANDING_SCORING_SOURCES.md). Sum to 1.0.
+DEFAULT_SCORING_WEIGHTS: dict[str, float] = {
+    "slope": 0.3,
+    "dust": 0.2,
+    "surface_temp": 0.2,
+    "thermal_inertia": 0.2,
+    "water": 0.1,
+}
+
+SCORING_WEIGHT_KEYS: tuple[str, ...] = tuple(DEFAULT_SCORING_WEIGHTS.keys())
+
+# Normalization ranges calibrated from mars_global_input_stack_32ppd.tif (100k random valid pixels, Jul 2026).
+# Dust: P5–P95 of observed OMEGA ferric (band 8). TI: P5–P95 of observed TES dayside TI (band 12).
+DUST_NORM_MIN = 0.0
+DUST_NORM_MAX = 1.022721
+THERMAL_INERTIA_NORM_MIN = 36.074046
+THERMAL_INERTIA_NORM_MAX = 332.326628
+
+# Aliases for API / agent / UI (canonical keys above).
+SCORING_WEIGHT_ALIASES: dict[str, str] = {
+    "slope": "slope",
+    "dust": "dust",
+    "ferric": "dust",
+    "surface_temp": "surface_temp",
+    "surface_temperature": "surface_temp",
+    "surface temperature": "surface_temp",
+    "temp": "surface_temp",
+    "temperature_weight": "surface_temp",
+    "thermal_inertia": "thermal_inertia",
+    "thermal inertia": "thermal_inertia",
+    "ti": "thermal_inertia",
+    "water": "water",
+    "grs": "water",
+    "grs_water": "water",
+    "grsWaterWt": "water",
+}
+
+
+def _canonical_weight_key(key: str) -> str | None:
+    k = str(key).strip().lower().replace("-", "_")
+    if k in DEFAULT_SCORING_WEIGHTS:
+        return k
+    return SCORING_WEIGHT_ALIASES.get(k) or SCORING_WEIGHT_ALIASES.get(str(key).strip().lower())
+
+
+def parse_scoring_weights(raw: dict | None) -> dict[str, float]:
+    """
+    Parse and normalize user scoring weights. Accepts fractions (0–1) or percents (0–100).
+    Missing keys use research defaults, then the vector is renormalized to sum to 1.
+    """
+    if raw is None or (isinstance(raw, dict) and len(raw) == 0):
+        return dict(DEFAULT_SCORING_WEIGHTS)
+
+    if not isinstance(raw, dict):
+        raise ValueError("scoring_weights must be a JSON object")
+
+    parsed: dict[str, float] = {}
+    for key, val in raw.items():
+        canon = _canonical_weight_key(key)
+        if canon is None:
+            raise ValueError(
+                f"Unknown scoring weight key '{key}'. "
+                f"Use: {', '.join(SCORING_WEIGHT_KEYS)}"
+            )
+        try:
+            f = float(val)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Weight for '{key}' must be a number") from exc
+        if f < 0:
+            raise ValueError(f"Weight for '{key}' must be non-negative")
+        parsed[canon] = f
+
+    weights = {k: parsed.get(k, DEFAULT_SCORING_WEIGHTS[k]) for k in SCORING_WEIGHT_KEYS}
+    total = sum(weights.values())
+    if total <= 0:
+        raise ValueError("Scoring weights must sum to a positive value")
+
+    if max(weights.values()) > 1.0 or total > 1.01:
+        weights = {k: v / 100.0 for k, v in weights.items()}
+        total = sum(weights.values())
+
+    if abs(total - 1.0) > 1e-3:
+        weights = {k: v / total for k, v in weights.items()}
+
+    return weights
+
+
+def scoring_weights_as_percent(weights: dict[str, float]) -> dict[str, float]:
+    """Display-friendly percents that sum to ~100."""
+    w = parse_scoring_weights(weights)
+    return {k: round(v * 100.0, 2) for k, v in w.items()}
+
+
 def raster_band_valid(arr: np.ndarray, nodata) -> np.ndarray:
     """
     Element-wise mask: finite and not equal to GDAL nodata (when defined).
@@ -134,14 +227,7 @@ class LandingSuitabilityScorer:
     LANDING_SCORING_SOURCES.md (repo root)
     """
     def __init__(self, weights=None):
-        default_weights = {
-            "slope": 0.3,
-            "dust": 0.2,
-            "surface_temp": 0.2,
-            "thermal_inertia": 0.2,
-            "water": 0.1
-        }
-        self.weights = weights if weights else default_weights
+        self.weights = parse_scoring_weights(weights)
 
     def normalize(self, value, min_val, max_val, invert=False):
         score = (value - min_val) / (max_val - min_val)
@@ -174,17 +260,17 @@ class LandingSuitabilityScorer:
         # Range 0-5° selected for discrimination within safe zone
         slope_score = self.normalize(slope, 0, 5, invert=True)  # ML gives 0.7-4.8°, so use 0-5°
         
-        # Dust: Avoid dust-dominated surfaces (multiple NASA sources)
-        # Lower dust = better surface stability and load-bearing capacity
-        dust_score = self.normalize(dust, 0.6, 0.7, invert=True)  # ML gives 0.64-0.70, so use 0.6-0.7
+        # Dust: lower ferric/dust index = better (range from global stack P5–P95, Jul 2026)
+        dust_score = self.normalize(dust, DUST_NORM_MIN, DUST_NORM_MAX, invert=True)
         
         # Temperature: Thermal management constraint (±30° latitude)
         # Warmer temperatures better for instrument operation and power efficiency
         temp_score = self.normalize(surface_temp, -90, -40, invert=False)  # ML gives -40 to -90°C, so use -90 to -40°C
         
-        # Thermal Inertia: Higher = more stable, rocky surface with better load-bearing
-        # Indicates surface trafficability and stability
-        inertia_score = self.normalize(thermal_inertia, 100, 400, invert=False)  # ML gives 100-400, so use 100-400
+        # Thermal inertia: higher = more stable surface (range from global stack P5–P95, Jul 2026)
+        inertia_score = self.normalize(
+            thermal_inertia, THERMAL_INERTIA_NORM_MIN, THERMAL_INERTIA_NORM_MAX, invert=False
+        )
         
         # Water: Scientific interest (secondary to engineering safety)
         # Higher water content indicates scientific value but not safety-critical
@@ -200,6 +286,50 @@ class LandingSuitabilityScorer:
 
         return round(final_score * 100, 2)
 
+    def score_site_breakdown(
+        self,
+        slope,
+        dust,
+        surface_temp,
+        thermal_inertia,
+        water,
+    ) -> tuple[float, dict[str, dict[str, float]]]:
+        """
+        Same rubric as score_site; also returns per-property normalized scores and contributions.
+        """
+        slope_n = float(self.normalize(slope, 0, 5, invert=True))
+        dust_n = float(self.normalize(dust, DUST_NORM_MIN, DUST_NORM_MAX, invert=True))
+        temp_n = float(self.normalize(surface_temp, -90, -40, invert=False))
+        inertia_n = float(
+            self.normalize(
+                thermal_inertia, THERMAL_INERTIA_NORM_MIN, THERMAL_INERTIA_NORM_MAX, invert=False
+            )
+        )
+        water_n = float(self.normalize(water, 1, 8, invert=False))
+
+        parts = {
+            "slope": slope_n,
+            "dust": dust_n,
+            "surface_temp": temp_n,
+            "thermal_inertia": inertia_n,
+            "water": water_n,
+        }
+        breakdown: dict[str, dict[str, float]] = {}
+        total = 0.0
+        for key, norm in parts.items():
+            wt = self.weights[key]
+            contrib = norm * wt
+            total += contrib
+            breakdown[key] = {
+                "normalized_score": round(norm, 4),
+                "weight": round(wt, 4),
+                "weight_percent": round(wt * 100.0, 2),
+                "contribution": round(contrib, 4),
+                "contribution_percent": round(contrib * 100.0, 2),
+            }
+        percent = round(float(np.clip(total, 0, 1)) * 100.0, 2)
+        return percent, breakdown
+
     def score_site_arrays(self, slope, dust, surface_temp, thermal_inertia, water):
         """
         Same rubric as score_site, vectorized over numpy arrays (element-wise).
@@ -212,9 +342,11 @@ class LandingSuitabilityScorer:
         water = np.asarray(water, dtype=np.float64)
 
         slope_score = self.normalize(slope, 0, 5, invert=True)
-        dust_score = self.normalize(dust, 0.6, 0.7, invert=True)
+        dust_score = self.normalize(dust, DUST_NORM_MIN, DUST_NORM_MAX, invert=True)
         temp_score = self.normalize(surface_temp, -90, -40, invert=False)
-        inertia_score = self.normalize(thermal_inertia, 100, 400, invert=False)
+        inertia_score = self.normalize(
+            thermal_inertia, THERMAL_INERTIA_NORM_MIN, THERMAL_INERTIA_NORM_MAX, invert=False
+        )
         water_score = self.normalize(water, 1, 8, invert=False)
 
         final_score = (

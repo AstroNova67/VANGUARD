@@ -16,7 +16,7 @@ The **3D globe** loads **bundled GeoTIFFs** under `frontend/3d_globe/public/data
 | **Client** | `frontend/3d_globe/index.js` | Click → lat/lon → each registered GeoTIFF is sampled at that point → JSON body (`elevation`, `slope`, `temperature`, `thermalInertia`, `ferric`, …). |
 | **Inference inputs** | `backend/scoring.py` → `map_mars_data_to_features` | Turns that JSON into scaled feature vectors per model (same file also runs inverse transforms on raw NN outputs). |
 | **Models** | `backend/app.py` | Loads saved Keras + XGB checkpoints from `saved_models/`; runs all heads for transparency; **raster-first** per scored property (see `data_sources` in the response). |
-| **Landing %** | `backend/scoring.py` → `LandingSuitabilityScorer` | Combines the five property values (observed where valid, else ML) with fixed weights (see `LANDING_SCORING_SOURCES.md`). |
+| **Landing %** | `backend/scoring.py` → `LandingSuitabilityScorer` | Combines the five property values (observed where valid, else ML) with configurable weights (research defaults in `LANDING_SCORING_SOURCES.md`; override via UI or `scoring_weights` in `/predict` and `/agent/chat`). |
 
 **Trained ML weights:** Checkpoints under `saved_models/` come from the `backend/*_predictor.py` training scripts and are unchanged by the landing-score rubric. **`map_mars_data_to_features`** (`scoring.py`) still maps JSON into model inputs; the surface-temperature NN/XGB **input** slot 3 uses **`thermalInertia`** (TES dayside TI), matching training. **Gap-fill:** when a scored property has **no valid raster sample** in the request, `backend/app.py` uses ML for that property. For **surface temperature** and **thermal inertia** only, if the corresponding raster is missing, **`_fuse_*_for_score`** in `app.py` keeps the prior **NN vs XGB** choice among model outputs (no raster substitution in that branch). **`data_sources`** in the JSON states, per property, whether the value that entered the rubric was **`raster`** or **`ml_predicted`**.
 
@@ -71,6 +71,13 @@ uv run python backend/app.py
 ```
 
 The API will start on `http://localhost:5002` (or port 5000 if 5002 is unavailable).
+
+**Mars assistant (optional):** copy `.env.example` to `.env` at the repo root and set `OPENAI_API_KEY`. With the Flask app running, open the globe UI — a **Mars Assistant** panel appears on the **right** (minimize with **−**, reopen via the **Assistant** tab). It calls `POST /agent/chat` and automatically includes your current lat/lon when you have loaded a point on the globe. Ask it to **show Gale crater** or **switch the globe to slope** — it returns `ui_actions` that move the camera, load rasters, run prediction, and change the surface layer (safe Markdown in chat, not raw HTML). Server-side trace: `VANGUARD_AGENT_TRACE=1` logs each tool call and UI action to stderr.
+
+```bash
+# Interactive CLI (alternative to the in-app panel)
+uv run python backend/agent.py
+```
 
 Optional: for detailed server logs and per-request HTTP lines, run with `VANGUARD_VERBOSE=1` (default is a short, readable startup + one line per `/predict`).
 
@@ -234,6 +241,7 @@ VANGUARD/
 The Flask API provides the following endpoints:
 
 - `POST /predict` - Get landing suitability prediction (includes all property predictions)
+- `POST /agent/chat` - Chat with the VANGUARD Mars assistant (`{"message": "..."}`); uses OpenAI + tools (site lookup, README, landing analysis at lat/lon). Requires `OPENAI_API_KEY` in repo-root `.env`.
 - `GET /health` - Check API server health and model loading status
 - `GET /models` - Get information about loaded ML models
 

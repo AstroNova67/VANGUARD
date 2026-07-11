@@ -27,4 +27,20 @@ node_modules/
 # Large aligned Mars GeoTIFFs (scripts/align_mars_input_layers.py)
 scripts/aligned_layers/*.tif
 
+# MOLA MEGDR 128 PPD download + mosaic (scripts/build_mola_128ppd_global.py)
+scripts/mola_128ppd_raw/
+
+# Derived slope rasters (scripts/derive_slope_from_mola.py)
+scripts/derived_layers/
+
+# Local backups
+backend/*.bak
+
+# Multi-GB rasters (rebuild locally; not suitable for git)
+frontend/3d_globe/public/data/mars_global_input_stack_32ppd.tif
+frontend/3d_globe/public/data/mars_landing_suitability_ml.tif
+frontend/3d_globe/public/data/mars_landing_suitability_ml copy.tif
+scripts/resolution_study/stacks/
+scripts/resolution_study/outputs/
+
 .env

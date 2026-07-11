@@ -8,7 +8,6 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler
-from tensorflow.keras.callbacks import EarlyStopping
 
 SEED = 42
 np.random.seed(SEED)
@@ -118,3 +117,9 @@ if __name__ == "__main__":
     )
     model.preprocess()
     model.load_best_model()
+
+#  Metrics
+
+# R2: 0.8887169595762378
+# MAE: 2.2528258165921886
+

@@ -72,6 +72,9 @@ dependencies = [
     "Flask-CORS==4.0.0",
     "gunicorn>=23.0.0",
     "rasterio>=1.4.4",
+    "openai-agents>=0.17.2",
+    "pydantic>=2.0",
+    "load-dotenv>=0.1.0",
 ]
 
 [dependency-groups]

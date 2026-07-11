@@ -1,3 +1,5 @@
+import asyncio
+import json
 import logging
 import mimetypes
 import os
@@ -5,6 +7,8 @@ import pickle
 import sys
 import traceback
 import warnings
+
+from dotenv import load_dotenv
 
 # Pickled scalers may be one sklearn micro-version off from the installed wheel; suppress noisy UI.
 try:
@@ -60,19 +64,6 @@ tf.config.run_functions_eagerly(False)
 
 # Handle imports for both local development and production (Render)
 # Try absolute import first (for Render), fall back to relative import (for local)
-try:
-    from backend.scoring import (
-        DATA_SOURCE_ML_PREDICTED,
-        LandingSuitabilityScorer,
-        predict_properties_nn,
-    )
-except ImportError:
-    # For local development when running from backend/ directory
-    from scoring import (
-        DATA_SOURCE_ML_PREDICTED,
-        LandingSuitabilityScorer,
-        predict_properties_nn,
-    )
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
@@ -92,99 +83,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend', '3d_globe')
 
-def _clamp_predictions(preds: dict) -> dict:
-    """Clamp predictions to plausible physical ranges for stability."""
-    out = dict(preds)
-    if 'slope' in out:
-        out['slope'] = max(0.0, float(out['slope']))
-    if 'dust' in out:
-        out['dust'] = float(min(1.0, max(0.0, out['dust'])))
-    if 'surface_temp' in out:
-        # Allow wide Mars temps; do not clamp too hard, keep as float
-        out['surface_temp'] = float(out['surface_temp'])
-    if 'thermal_inertia' in out:
-        out['thermal_inertia'] = max(0.0, float(out['thermal_inertia']))
-    if 'water' in out:
-        # Cap to 0–8% per scoring normalization
-        out['water'] = float(min(8.0, max(0.0, out['water'])))
-    return out
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"), override=True)
 
-
-def _finite_number(x) -> bool:
-    if x is None:
-        return False
-    try:
-        f = float(x)
-    except (TypeError, ValueError):
-        return False
-    return bool(np.isfinite(f))
-
-
-def _fuse_surface_temp_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
-    """
-    Choose NN vs XGB for landing score.
-    When raster `temperature` is present in the payload, pick whichever prediction is
-    closest to it (among physically plausible candidates). Otherwise prefer XGB when
-    in range, matching the previous API behavior.
-    Returns (value_for_score, overrides_applied_key_or_None).
-    """
-    obs = mars_data.get("temperature")
-    nn_ok = _finite_number(nn_val)
-    xgb_ok = _finite_number(xgb_val) and -200.0 <= float(xgb_val) <= 50.0
-
-    if _finite_number(obs):
-        obs_f = float(obs)
-        candidates = []
-        if nn_ok:
-            candidates.append(("nn", float(nn_val), abs(float(nn_val) - obs_f)))
-        if xgb_ok:
-            candidates.append(("xgb", float(xgb_val), abs(float(xgb_val) - obs_f)))
-        if not candidates:
-            return (float(nn_val), "surface_temp_nn") if nn_ok else (0.0, None)
-        # Min error; tie-break prefers XGB
-        candidates.sort(key=lambda t: (t[2], 0 if t[0] == "xgb" else 1))
-        winner, val, _ = candidates[0]
-        src = "surface_temp_xgb" if winner == "xgb" else "surface_temp_nn"
-        return (val, src)
-
-    if xgb_ok:
-        return (float(xgb_val), "surface_temp_xgb")
-    if nn_ok:
-        return (float(nn_val), "surface_temp_nn")
-    return (0.0, None)
-
-
-def _fuse_thermal_inertia_for_score(nn_val, xgb_val, mars_data: dict) -> tuple:
-    """
-    Same pattern as surface temp. Uses optional `thermalInertia` or `thermal_inertia`
-    in the request when present (not sent by the current globe UI); otherwise XGB when
-    in [50, 2000], else neural.
-    """
-    obs = mars_data.get("thermalInertia")
-    if obs is None:
-        obs = mars_data.get("thermal_inertia")
-    nn_ok = _finite_number(nn_val)
-    xgb_ok = _finite_number(xgb_val) and 50.0 <= float(xgb_val) <= 2000.0
-
-    if _finite_number(obs):
-        obs_f = float(obs)
-        candidates = []
-        if nn_ok:
-            candidates.append(("nn", float(nn_val), abs(float(nn_val) - obs_f)))
-        if xgb_ok:
-            candidates.append(("xgb", float(xgb_val), abs(float(xgb_val) - obs_f)))
-        if not candidates:
-            return (float(nn_val), "thermal_inertia_nn") if nn_ok else (0.0, None)
-        candidates.sort(key=lambda t: (t[2], 0 if t[0] == "xgb" else 1))
-        src = "thermal_inertia_xgb" if candidates[0][0] == "xgb" else "thermal_inertia_nn"
-        return (candidates[0][1], src)
-
-    if xgb_ok:
-        return (float(xgb_val), "thermal_inertia_xgb")
-    if nn_ok:
-        return (float(nn_val), "thermal_inertia_nn")
-    return (0.0, None)
-
+try:
+    from backend.landing_predict import compute_landing_prediction
+except ImportError:
+    from landing_predict import compute_landing_prediction
 
 def load_scalers():
     """Load all saved scalers and transformers"""
@@ -288,79 +192,6 @@ def load_models():
         + ("; regression: ok" if reg_ok else "; regression: unavailable")
     )
 
-def predict_with_neural_networks(mars_data):
-    """Use neural networks to predict properties (inverse-transformed to real units)"""
-    try:
-        slope, dust, surface_temp, thermal_inertia, water = predict_properties_nn(mars_data)
-        return {
-            'slope': float(slope),
-            'dust': float(dust),
-            'surface_temp': float(surface_temp),
-            'thermal_inertia': float(thermal_inertia),
-            'water': float(water)
-        }
-    except Exception as e:
-        _log_error(f"Error in predict_with_neural_networks: {e}")
-        return {
-            'slope': 0.0,
-            'dust': 0.0,
-            'surface_temp': 0.0,
-            'thermal_inertia': 0.0,
-            'water': 0.0
-        }
-
-def predict_with_regression_models(mars_data):
-    """Use regression models to predict properties
-    Note: Regression models use different feature sets than neural networks
-    """
-    predictions = {}
-    
-    if len(regression_models) == 0:
-        # Provide mock predictions when models fail to load
-        _log_debug("Using mock regression predictions (models not loaded)")
-        predictions = {
-            'surface_temp_xgb': -44.8,
-            'thermal_inertia_xgb': 445.2
-        }
-    else:
-        # Import scoring module for regression model feature mapping
-        try:
-            from backend.scoring import map_mars_data_to_features as scoring_map_features
-        except ImportError:
-            from scoring import map_mars_data_to_features as scoring_map_features
-        
-        # Surface temperature predictions (5 features)
-        if 'surface_temp' in regression_models:
-            try:
-                features = scoring_map_features(mars_data, 'surface_temp')
-                xgb_pred = regression_models['surface_temp']['xgb'].predict(features)[0]
-                predictions['surface_temp_xgb'] = float(xgb_pred)
-            except Exception as e:
-                _log_error(f"Error predicting surface_temp with XGB: {e}")
-                predictions['surface_temp_xgb'] = 0.0
-        
-        # Thermal inertia predictions (4 features: temp_range, albedo, slope, ferric)
-        # Note: XGBoost model was trained on RAW features (not transformed), so we need to prepare features without the QuantileTransformer
-        if 'thermal_inertia' in regression_models:
-            try:
-                # Extract raw features matching the CSV columns:
-                # ['Yearly Mars Surface Temperature Variation (C)', 'Albedo', 'Slope', 'OMEGA Ferric/Dust 860nm ratio']
-                temp_range = mars_data.get('tempRange', 0)
-                albedo = mars_data.get('albedo', 0)
-                slope = mars_data.get('slope', 0)
-                ferric = mars_data.get('ferric', 0)
-                
-                # XGBoost was trained on raw features (no transformation needed)
-                # Shape: (1, 4) for single prediction
-                features = np.array([[temp_range, albedo, slope, ferric]])
-                xgb_pred = regression_models['thermal_inertia']['xgb'].predict(features)[0]
-                predictions['thermal_inertia_xgb'] = float(xgb_pred)
-            except Exception as e:
-                _log_error(f"Error predicting thermal_inertia with XGB: {e}")
-                predictions['thermal_inertia_xgb'] = 0.0
-    
-    return predictions
-
 @app.route('/predict', methods=['POST'])
 def predict_landing_suitability():
     """Main API endpoint for landing suitability prediction"""
@@ -382,89 +213,44 @@ def predict_landing_suitability():
                 'landing_score': 0
             }), 400
         
-        # Get Mars data from frontend
-        mars_data = request.get_json()
-        if mars_data is None:
+        body = request.get_json()
+        if body is None:
             return jsonify({
                 'success': False,
                 'error': 'Invalid JSON in request body',
                 'landing_score': 0
             }), 400
-        
-        # Pure neural-network outputs (clamped for display).
-        nn_baseline = _clamp_predictions(predict_with_neural_networks(mars_data))
-        reg_predictions = predict_with_regression_models(mars_data)
 
-        overrides_applied = {}
-        data_sources = {}
-        fused_predictions = {}
+        try:
+            from backend.landing_predict import split_predict_payload
+        except ImportError:
+            from landing_predict import split_predict_payload
 
-        # Landing % always uses ML columns (UI pins only Neural / XGB). Slope, dust, water: Keras
-        # outputs. Surface temp / TI: NN vs XGB fusion (raster temperature / TI in the JSON
-        # still guides which model wins when both are plausible).
-        fused_predictions["slope"] = nn_baseline["slope"]
-        data_sources["slope"] = DATA_SOURCE_ML_PREDICTED
+        try:
+            mars_data, scoring_weights = split_predict_payload(body)
+        except ValueError as ve:
+            return jsonify({
+                'success': False,
+                'error': str(ve),
+                'landing_score': 0,
+            }), 400
 
-        fused_predictions["dust"] = nn_baseline["dust"]
-        data_sources["dust"] = DATA_SOURCE_ML_PREDICTED
-
-        surface_temp_xgb = reg_predictions.get("surface_temp_xgb", None)
-        st_val, st_src = _fuse_surface_temp_for_score(
-            nn_baseline.get("surface_temp"),
-            surface_temp_xgb,
+        response = compute_landing_prediction(
             mars_data,
+            models_loaded=models_loaded,
+            regression_models=regression_models,
+            scoring_weights=scoring_weights,
+            log_error=_log_error,
+            log_debug=_log_debug,
         )
-        if st_src:
-            fused_predictions["surface_temp"] = st_val
-            overrides_applied["surface_temp"] = st_src
-        elif _finite_number(nn_baseline.get("surface_temp")):
-            fused_predictions["surface_temp"] = float(nn_baseline["surface_temp"])
-            overrides_applied["surface_temp"] = "surface_temp_nn"
-        elif _finite_number(st_val):
-            fused_predictions["surface_temp"] = st_val
-            overrides_applied["surface_temp"] = "surface_temp_nn"
-        else:
-            fused_predictions["surface_temp"] = 0.0
-            overrides_applied["surface_temp"] = "surface_temp_nn"
-        data_sources["surface_temp"] = DATA_SOURCE_ML_PREDICTED
+        if not response.get("success"):
+            status = 503 if "loading" in str(response.get("error", "")).lower() else 500
+            return jsonify(response), status
 
-        thermal_inertia_xgb = reg_predictions.get("thermal_inertia_xgb", None)
-        ti_val, ti_src = _fuse_thermal_inertia_for_score(
-            nn_baseline.get("thermal_inertia"),
-            thermal_inertia_xgb,
-            mars_data,
-        )
-        if ti_src:
-            fused_predictions["thermal_inertia"] = ti_val
-            overrides_applied["thermal_inertia"] = ti_src
-        elif _finite_number(nn_baseline.get("thermal_inertia")):
-            fused_predictions["thermal_inertia"] = float(nn_baseline["thermal_inertia"])
-            overrides_applied["thermal_inertia"] = "thermal_inertia_nn"
-        elif _finite_number(ti_val):
-            fused_predictions["thermal_inertia"] = ti_val
-            overrides_applied["thermal_inertia"] = "thermal_inertia_nn"
-        else:
-            fused_predictions["thermal_inertia"] = 0.0
-            overrides_applied["thermal_inertia"] = "thermal_inertia_nn"
-        data_sources["thermal_inertia"] = DATA_SOURCE_ML_PREDICTED
-
-        fused_predictions["water"] = nn_baseline["water"]
-        data_sources["water"] = DATA_SOURCE_ML_PREDICTED
-
-        fused_predictions = _clamp_predictions(fused_predictions)
-
-        # Landing score: LandingSuitabilityScorer matches LANDING_SCORING_SOURCES.md
-        # (weights 30/20/20/20/10, normalization ranges, slope/dust inverted).
-        scorer = LandingSuitabilityScorer()
-        landing_score = scorer.score_site(
-            slope=fused_predictions.get("slope", 0),
-            dust=fused_predictions.get("dust", 0),
-            surface_temp=fused_predictions.get("surface_temp", 0),
-            thermal_inertia=fused_predictions.get("thermal_inertia", 0),
-            water=fused_predictions.get("water", 0),
-            property_sources=data_sources,
-        )
-
+        fused = (response.get("predictions") or {}).get("neural_networks") or {}
+        overrides_applied = response.get("overrides_applied") or {}
+        data_sources = response.get("data_sources") or {}
+        landing_score = response.get("landing_score")
         lat = mars_data.get("lat")
         lon = mars_data.get("lon")
         loc = ""
@@ -476,32 +262,15 @@ def predict_landing_suitability():
         )
         _log_info(
             f"POST /predict → landing_score={landing_score}%{loc} | "
-            f"score_inputs slope={fused_predictions.get('slope')} dust={fused_predictions.get('dust')} "
-            f"surface_temp={fused_predictions.get('surface_temp')} (src={st_src_log}) "
-            f"thermal_inertia={fused_predictions.get('thermal_inertia')} (src={ti_src_log}) "
-            f"water={fused_predictions.get('water')}"
+            f"score_inputs slope={fused.get('slope')} dust={fused.get('dust')} "
+            f"surface_temp={fused.get('surface_temp')} (src={st_src_log}) "
+            f"thermal_inertia={fused.get('thermal_inertia')} (src={ti_src_log}) "
+            f"water={fused.get('water')}"
         )
-        _log_debug(f"  fused: {fused_predictions}")
+        _log_debug(f"  fused: {fused}")
         _log_debug(f"  data_sources: {data_sources}")
-        _log_debug(f"  regression: {reg_predictions} overrides={overrides_applied}")
+        _log_debug(f"  overrides={overrides_applied}")
 
-        # Prepare response
-        response = {
-            'success': True,
-            'landing_score': landing_score,
-            'predictions': {
-                # Final property bundle used for landing_score (all ML: Keras for slope/dust/water;
-                # surface_temp and thermal_inertia from NN vs XGB fusion).
-                'neural_networks': fused_predictions,
-                # Neural nets only (for UI comparison; not necessarily what the score used).
-                'neural_networks_baseline': nn_baseline,
-                'regression_models': reg_predictions
-            },
-            'data_sources': data_sources,
-            'overrides_applied': overrides_applied,
-            'raw_mars_data': mars_data
-        }
-        
         return jsonify(response)
         
     except Exception as e:
@@ -531,6 +300,79 @@ def handle_exception(e):
         'error': str(e),
         'landing_score': 0
     }), 500
+
+@app.route('/scoring/weights', methods=['GET'])
+def get_scoring_weights_defaults():
+    """Research-based default landing suitability weights (fractions and percents)."""
+    try:
+        from backend.scoring import (
+            DEFAULT_SCORING_WEIGHTS,
+            SCORING_WEIGHT_KEYS,
+            scoring_weights_as_percent,
+        )
+    except ImportError:
+        from scoring import (
+            DEFAULT_SCORING_WEIGHTS,
+            SCORING_WEIGHT_KEYS,
+            scoring_weights_as_percent,
+        )
+    return jsonify({
+        'success': True,
+        'keys': list(SCORING_WEIGHT_KEYS),
+        'weights': DEFAULT_SCORING_WEIGHTS,
+        'weights_percent': scoring_weights_as_percent(DEFAULT_SCORING_WEIGHTS),
+        'description': (
+            'Customize via POST /predict or /agent/chat using scoring_weights. '
+            'Values may be fractions (0–1) or percents (0–100); they are renormalized to sum to 1.'
+        ),
+    })
+
+
+@app.route('/agent/chat', methods=['POST'])
+def agent_chat():
+    """Chat with the VANGUARD Mars assistant (OpenAI Agents SDK)."""
+    if not request.is_json:
+        return jsonify({'success': False, 'error': 'Request must be JSON'}), 400
+    body = request.get_json() or {}
+    message = body.get('message') or body.get('input')
+    if not message or not str(message).strip():
+        return jsonify({'success': False, 'error': 'message is required'}), 400
+    if not os.getenv("OPENAI_API_KEY"):
+        return jsonify({
+            'success': False,
+            'error': 'OPENAI_API_KEY is not set. Add it to .env at the repo root.',
+        }), 503
+    try:
+        try:
+            from backend.agent import run_agent_turn
+        except ImportError:
+            from agent import run_agent_turn
+        scoring_weights = body.get('scoring_weights') or body.get('scoringWeights')
+        out = asyncio.run(
+            run_agent_turn(str(message).strip(), scoring_weights=scoring_weights)
+        )
+        reply = out.get('reply', '')
+        if not isinstance(reply, str):
+            reply = json.dumps(reply, ensure_ascii=False) if isinstance(reply, (dict, list)) else str(reply)
+        ui_actions = out.get('ui_actions') or []
+        if _verbose():
+            _log_debug(
+                f"  /agent/chat reply_chars={len(reply)} ui_actions={len(ui_actions)}"
+            )
+        structured = out.get('structured')
+        payload = {
+            'success': True,
+            'reply': reply,
+            'ui_actions': ui_actions,
+        }
+        if structured is not None:
+            payload['structured'] = structured
+        return jsonify(payload)
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        _log_error(f"Error in /agent/chat: {e}\n{error_trace}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -563,8 +405,8 @@ def index():
 @app.route('/<path:path>')
 def serve_frontend(path):
     """Serve frontend static files (JS, CSS, textures, data, etc.)"""
-    # Don't serve API routes through this handler
-    if path.startswith('predict') or path.startswith('health') or path.startswith('models'):
+    # Don't serve API routes through this static handler (allow e.g. agent-chat.js)
+    if path in ('predict', 'health', 'models', 'scoring/weights') or path.startswith('agent/chat'):
         return jsonify({'error': 'Not found'}), 404
     
     # Security: prevent path traversal
@@ -599,7 +441,7 @@ def serve_frontend(path):
         
         _log_debug(f"Serving static: {path}")
         # Avoid stale module/HTML/rasters during local iteration on the globe UI.
-        max_age = 0 if path.lower().endswith((".html", ".js", ".tif", ".tiff")) else None
+        max_age = 0 if path.lower().endswith((".html", ".js", ".css", ".tif", ".tiff")) else None
         return send_file(
             file_path,
             mimetype=mimetype,
@@ -635,6 +477,7 @@ if __name__ == '__main__':
     _log_info("")
     _log_info("  Open in browser:  http://127.0.0.1:" + str(port))
     _log_info("  Predict endpoint: POST http://127.0.0.1:" + str(port) + "/predict")
+    _log_info("  Agent chat:       POST http://127.0.0.1:" + str(port) + "/agent/chat")
     if _verbose():
         _log_info("  (VANGUARD_VERBOSE=1 — debug logging on)")
     else:

@@ -1,3 +1,4 @@
+import os
 import random
 
 import joblib
@@ -22,6 +23,10 @@ tf.random.set_seed(SEED)
 # Feature columns and target variable
 independent_variables = ['Elevation', 'Albedo', 'Day Side Thermal Inertia', 'Slope', 'Roughness 0.6km']
 dependent_variable = 'Yearly Average Mars Surface Temperature (C)'
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SAVED_MODELS_DIR = os.path.join(BASE_DIR, 'saved_models')
+DATASETS_DIR = os.path.join(BASE_DIR, 'datasets')
 
 
 class SurfaceTempRegressor:
@@ -140,23 +145,34 @@ class SurfaceTempRegressor:
                 - XGBoost with its native save_model
         """
 
-        # Save Random Forest
-        joblib.dump(self.reg_forest, "saved_models/regression_models/surface_temp/rf_model.pkl")
+        # Save Random Forest (disabled — rf_model.pkl omitted due to size)
+        # joblib.dump(
+        #     self.reg_forest,
+        #     os.path.join(SAVED_MODELS_DIR, 'regression_models', 'surface_temp', 'rf_model.pkl'),
+        # )
         # Save XGBoost
-        self.xgb.save_model("saved_models/regression_models/surface_temp/xgb_model.json")
+        xgb_path = os.path.join(
+            SAVED_MODELS_DIR, 'regression_models', 'surface_temp', 'xgb_model.json'
+        )
+        self.xgb.save_model(xgb_path)
 
-        print("Models saved: rf_model.pkl, xgb_model.json")
+        print("Model saved: xgb_model.json")
 
     def load_model(self):
         """
         Load trained models back from disk.
         """
-        # Load Random Forest
-        self.reg_forest = joblib.load("saved_models/regression_models/surface_temp/rf_model.pkl")
+        # Load Random Forest (disabled — rf_model.pkl omitted due to size)
+        # self.reg_forest = joblib.load(
+        #     os.path.join(SAVED_MODELS_DIR, 'regression_models', 'surface_temp', 'rf_model.pkl')
+        # )
         # Load XGBoost
-        self.xgb.load_model("saved_models/regression_models/surface_temp/xgb_model.json")
+        xgb_path = os.path.join(
+            SAVED_MODELS_DIR, 'regression_models', 'surface_temp', 'xgb_model.json'
+        )
+        self.xgb.load_model(xgb_path)
 
-        print("Models loaded successfully")
+        print("XGBoost model loaded successfully")
 
     def print_score(self, z):
         score_labels = [
@@ -166,18 +182,22 @@ class SurfaceTempRegressor:
             "Grid Search Random Forest"
         ]
 
-        y_pred_forest = self.reg_forest.predict(self.x_test).flatten()
+        # y_pred_forest = self.reg_forest.predict(self.x_test).flatten()
         y_pred_xgb = self.xgb.predict(self.x_test).flatten()
 
         array = [
-            r2_score(self.y_test, y_pred_forest),
+            None,  # r2_score(self.y_test, y_pred_forest),
             r2_score(self.y_test, y_pred_xgb),
             getattr(self, 'score_best_xgb', None),
-            getattr(self, 'score_best_forest', None)
+            None,  # getattr(self, 'score_best_forest', None)
         ]
 
         score = array[z]
         label = score_labels[z]
+
+        if score is None:
+            print(f"Score ({label}): unavailable")
+            return
 
         print(f"Score ({label}): {round(score * 100, 3)}%")
 
@@ -254,7 +274,7 @@ class SurfaceTempNetwork:
             objective='val_loss',
             max_epochs=25,
             factor=3,
-            directory='saved_models/neural_nets/surface_temp_pred'
+            directory=os.path.join(SAVED_MODELS_DIR, 'neural_nets', 'surface_temp_pred')
         )
 
         stop_early = tf.keras.callbacks.EarlyStopping(
@@ -269,7 +289,9 @@ class SurfaceTempNetwork:
         model = tuner.hypermodel.build(best_hps)
         model.fit(self.x_train, self.y_train, epochs=250,
                   validation_split=0.2, callbacks=[stop_early])
-        model.save('saved_models/neural_nets/surface_temp_pred/best_model.keras')
+        model.save(
+            os.path.join(SAVED_MODELS_DIR, 'neural_nets', 'surface_temp_pred', 'best_model.keras')
+        )
 
         y_pred_log = model.predict(self.x_test).flatten()
         y_pred = self._inverse_transform(y_pred_log)
@@ -282,7 +304,7 @@ class SurfaceTempNetwork:
 
     def load_best_model(self):
         best_model = tf.keras.models.load_model(
-            'saved_models/neural_nets/surface_temp_pred/best_model.keras'
+            os.path.join(SAVED_MODELS_DIR, 'neural_nets', 'surface_temp_pred', 'best_model.keras')
         )
         y_pred_log = best_model.predict(self.x_test).flatten()
         y_pred = self._inverse_transform(y_pred_log)
@@ -295,8 +317,10 @@ class SurfaceTempNetwork:
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("datasets/combined_regions.csv")
+    df = pd.read_csv(os.path.join(DATASETS_DIR, "combined_regions.csv"))
     model = SurfaceTempRegressor(df)
     model.load_model()
-    model.print_score(0)
     model.print_score(1)
+
+    # Metrics
+    # Score (Baseline XGBoost): 92.226%

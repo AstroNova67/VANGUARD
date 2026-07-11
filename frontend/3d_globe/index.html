@@ -16,6 +16,9 @@
 
       body > canvas {
         display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 0;
       }
 
       body {
@@ -33,16 +36,36 @@
         -webkit-font-smoothing: antialiased;
       }
 
-      /* Globe canvas is inserted before this node; keep UI above the WebGL layer. */
-      #controls {
-        position: absolute;
+      /* Left column: main controls + layer legend share one stack so all panels fit. */
+      .vanguard-left-stack {
+        position: fixed;
         z-index: 2;
         top: 12px;
         left: 12px;
-        /* Readable sidebar without hiding the globe; horizontal scroll when the prediction table needs it. */
-        width: min(420px, calc(100vw - 24px));
-        max-width: min(460px, 46vw);
-        max-height: calc(100vh - 24px);
+        bottom: 12px;
+        width: min(360px, calc(100vw - min(300px, 30vw) - 40px));
+        max-width: 38vw;
+        min-width: 280px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      }
+
+      .vanguard-left-stack > * {
+        pointer-events: auto;
+      }
+
+      /* Globe canvas is inserted before this node; keep UI above the WebGL layer. */
+      #controls {
+        position: relative;
+        top: auto;
+        left: auto;
+        flex: 1 1 0;
+        min-height: 0;
+        width: 100%;
+        max-width: none;
+        max-height: none;
         overflow-y: auto;
         overflow-x: auto;
         background: rgba(6, 14, 26, 0.94);
@@ -349,6 +372,178 @@
         line-height: 1.2;
       }
 
+      .landing-overlay-legend {
+        display: none !important;
+      }
+
+      /* Layer legend docked under the main panel (not over the globe center). */
+      .map-legend-float {
+        position: relative;
+        flex: 0 0 auto;
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        max-height: min(38vh, 280px);
+        overflow-y: auto;
+        display: none;
+        padding: 10px 11px 9px;
+        border-radius: 12px;
+        background: rgba(6, 14, 26, 0.94);
+        border: 1px solid rgba(120, 175, 220, 0.38);
+        box-shadow:
+          0 8px 28px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(120, 160, 200, 0.35) transparent;
+      }
+
+      .map-legend-float.is-visible {
+        display: block;
+      }
+
+      .sci-legend {
+        --sci-accent: rgba(120, 175, 220, 0.85);
+      }
+
+      .sci-legend__title {
+        margin: 0 0 5px;
+        padding-bottom: 5px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: #d4e8f5;
+        border-bottom: 2px solid var(--sci-accent);
+        line-height: 1.3;
+        text-align: left;
+      }
+
+      .sci-legend__lede {
+        margin: 0 0 8px;
+        font-size: 9px;
+        line-height: 1.4;
+        color: #8aa8bc;
+        font-weight: 500;
+        text-align: left;
+      }
+
+      .sci-legend__scale-h {
+        margin: 0 0 6px;
+      }
+
+      .sci-legend__bar-h {
+        height: 12px;
+        width: 100%;
+        border-radius: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
+      .sci-legend__ticks-h {
+        position: relative;
+        height: 34px;
+        margin-top: 3px;
+      }
+
+      .sci-legend__tick-h {
+        position: absolute;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: max-content;
+        max-width: 52px;
+        line-height: 1.15;
+        text-align: center;
+      }
+
+      .sci-legend__tick-h--start {
+        align-items: flex-start;
+        text-align: left;
+        transform: translateX(0);
+      }
+
+      .sci-legend__tick-h--end {
+        align-items: flex-end;
+        text-align: right;
+        transform: translateX(-100%);
+      }
+
+      .sci-legend__tick-h--mid {
+        transform: translateX(-50%);
+      }
+
+      .sci-legend__tick-nub {
+        display: block;
+        width: 1px;
+        height: 5px;
+        margin-bottom: 2px;
+        background: rgba(255, 255, 255, 0.35);
+        border-radius: 1px;
+      }
+
+      .sci-legend__tick-val {
+        font-size: 9px;
+        font-weight: 800;
+        color: #e8f4fc;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .sci-legend__tick-qual {
+        display: block;
+        margin-top: 1px;
+        font-size: 7px;
+        font-weight: 600;
+        color: #7a9aad;
+        line-height: 1.2;
+        max-width: 52px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sci-legend__note {
+        margin: 0 0 5px;
+        font-size: 8px;
+        line-height: 1.4;
+        color: #8eb8d0;
+        text-align: left;
+      }
+
+      .sci-legend__file {
+        margin: 0 0 5px;
+        font-size: 8px;
+        line-height: 1.35;
+        color: #6d8a9c;
+        text-align: left;
+      }
+
+      .sci-legend__file span {
+        display: block;
+        font-size: 7px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #5d7a8e;
+        margin-bottom: 1px;
+      }
+
+      .sci-legend__file code {
+        font-size: 8px;
+        color: #a8cce0;
+        word-break: break-all;
+      }
+
+      .sci-legend__cite {
+        margin: 0;
+        font-size: 7px;
+        line-height: 1.35;
+        color: #6a8496;
+        text-align: left;
+      }
+
+      .sci-legend__cite em {
+        font-style: italic;
+      }
+
       .globe-surface-card {
         margin-top: 10px;
         flex-direction: column;
@@ -521,6 +716,11 @@
         border: none;
       }
 
+      #controls .btn-secondary:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+
       #predictLanding {
         margin-top: 0;
         width: 100%;
@@ -551,6 +751,67 @@
         font-size: 11px;
         line-height: 1.45;
         color: #6d8a9c;
+      }
+
+      .scoring-weights-panel {
+        margin: 10px 0 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(120, 160, 190, 0.25);
+        background: rgba(12, 28, 42, 0.55);
+      }
+
+      .scoring-weights-panel__summary {
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        color: #b8d4e8;
+      }
+
+      .scoring-weights-panel__lede {
+        margin: 8px 0 10px;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #8aa8bc;
+      }
+
+      .scoring-weights-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 10px;
+      }
+
+      .scoring-weights-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 11px;
+        color: #9eb8ca;
+      }
+
+      .scoring-weights-field input {
+        width: 100%;
+        padding: 6px 8px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid rgba(120, 160, 190, 0.35);
+        background: rgba(8, 18, 28, 0.8);
+        color: #e8f4fc;
+      }
+
+      .scoring-weights-sum {
+        margin: 8px 0 6px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #d4e8f5;
+      }
+
+      .scoring-weights-sum--warn {
+        color: #f0c878;
+      }
+
+      .scoring-weights-actions {
+        margin-top: 4px;
       }
       #predictLanding:hover:not(:disabled) {
         transform: translateY(-1px);
@@ -1111,6 +1372,367 @@
         font-size: 10px;
         color: #5d7a8c;
       }
+
+      /* --- Mars assistant (right panel) --- */
+      #agent-chat {
+        position: fixed;
+        z-index: 3;
+        top: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: min(300px, calc(100vw - min(360px, 38vw) - 36px));
+        max-width: 30vw;
+        min-width: 240px;
+        display: flex;
+        flex-direction: column;
+        background: rgba(6, 14, 26, 0.94);
+        border-radius: 14px;
+        border: 1px solid rgba(120, 175, 220, 0.35);
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.55),
+          0 0 0 1px rgba(255, 200, 120, 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        transition:
+          transform 0.22s ease,
+          opacity 0.22s ease,
+          width 0.22s ease;
+      }
+
+      #agent-chat.agent-chat--minimized {
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        bottom: auto;
+        height: auto;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+      }
+
+      #agent-chat.agent-chat--minimized .agent-chat-panel {
+        display: none;
+      }
+
+      #agentChatToggle {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        margin-left: auto;
+        border: 1px solid rgba(120, 175, 220, 0.4);
+        border-radius: 10px 0 0 10px;
+        background: rgba(6, 14, 26, 0.96);
+        color: #9fd4ff;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      }
+
+      #agent-chat.agent-chat--minimized #agentChatToggle {
+        display: flex;
+      }
+
+      .agent-chat-panel {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .agent-chat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        flex-shrink: 0;
+      }
+
+      .agent-chat-header h2 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        color: #9fd4ff;
+      }
+
+      .agent-chat-header-actions {
+        display: flex;
+        gap: 6px;
+      }
+
+      .agent-chat-icon-btn {
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        color: #9bb0c0;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .agent-chat-icon-btn:hover {
+        color: #e8f0f7;
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      #agentChatMessages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(120, 160, 200, 0.4) transparent;
+      }
+
+      .agent-chat-welcome {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #7a9aad;
+      }
+
+      .agent-chat-msg {
+        display: flex;
+        max-width: 100%;
+      }
+
+      .agent-chat-msg--user {
+        justify-content: flex-end;
+      }
+
+      .agent-chat-msg--assistant,
+      .agent-chat-msg--system {
+        justify-content: flex-start;
+      }
+
+      .agent-chat-msg__bubble {
+        max-width: 92%;
+        padding: 8px 11px;
+        border-radius: 10px;
+        font-size: 12px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .agent-chat-md-h {
+        margin: 0 0 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #b8dcf0;
+      }
+
+      .agent-chat-md-p {
+        margin: 0 0 6px;
+      }
+
+      .agent-chat-md-p:last-child,
+      .agent-chat-md-ul:last-child {
+        margin-bottom: 0;
+      }
+
+      .agent-chat-md-ul {
+        margin: 0 0 6px;
+        padding-left: 1.1rem;
+      }
+
+      .agent-chat-md-ul li {
+        margin-bottom: 4px;
+      }
+
+      .agent-chat-msg__bubble strong {
+        color: #e8f4fc;
+        font-weight: 600;
+      }
+
+      .agent-chat-msg--user .agent-chat-msg__bubble {
+        background: rgba(50, 120, 180, 0.45);
+        border: 1px solid rgba(120, 180, 230, 0.35);
+        color: #e8f4fc;
+        border-bottom-right-radius: 3px;
+      }
+
+      .agent-chat-msg--assistant .agent-chat-msg__bubble {
+        background: rgba(20, 40, 60, 0.65);
+        border: 1px solid rgba(100, 150, 190, 0.25);
+        color: #d4e8f5;
+        border-bottom-left-radius: 3px;
+        white-space: normal;
+      }
+
+      .agent-chat-msg__meta {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(100, 150, 190, 0.2);
+        font-size: 11px;
+        line-height: 1.4;
+        color: #9ec4dc;
+        white-space: pre-wrap;
+      }
+
+      .agent-chat-msg--system .agent-chat-msg__bubble {
+        background: rgba(80, 40, 40, 0.4);
+        border: 1px solid rgba(200, 100, 100, 0.3);
+        color: #f0c8c8;
+        font-size: 11px;
+      }
+
+      .agent-chat-footer {
+        flex-shrink: 0;
+        padding: 10px 12px 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      #agentChatForm {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+      }
+
+      #agentChatInput {
+        flex: 1;
+        min-height: 40px;
+        max-height: 120px;
+        resize: vertical;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(120, 170, 210, 0.3);
+        background: rgba(0, 0, 0, 0.35);
+        color: #e8f0f7;
+        font-family: inherit;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      #agentChatInput:focus {
+        outline: none;
+        border-color: rgba(140, 200, 255, 0.55);
+      }
+
+      #agentChatSend {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: linear-gradient(180deg, #3a6a8a 0%, #2a4d66 100%);
+        color: #eef4fa;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      #agentChatSend:hover:not(:disabled) {
+        background: linear-gradient(180deg, #4a7a9a 0%, #355d76 100%);
+      }
+
+      #agentChatSend:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .agent-chat-status {
+        margin: 6px 2px 0;
+        font-size: 10px;
+        color: #6a8a9a;
+        min-height: 14px;
+      }
+
+      .agent-chat-status--error {
+        color: #e8a0a0;
+      }
+
+      /* Sequential typing indicator (ChatGPT / iMessage style) */
+      .agent-chat-msg__bubble--typing {
+        padding: 12px 14px;
+        min-width: 52px;
+      }
+
+      .agent-chat-typing {
+        display: inline-flex;
+        align-items: flex-end;
+        gap: 5px;
+        height: 14px;
+      }
+
+      .agent-chat-typing__dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: rgba(160, 210, 245, 0.95);
+        animation: agent-chat-dot-bounce 1.2s ease-in-out infinite;
+        will-change: transform, opacity;
+      }
+
+      .agent-chat-typing__dot:nth-child(1) {
+        animation-delay: 0s;
+      }
+
+      .agent-chat-typing__dot:nth-child(2) {
+        animation-delay: 0.18s;
+      }
+
+      .agent-chat-typing__dot:nth-child(3) {
+        animation-delay: 0.36s;
+      }
+
+      @keyframes agent-chat-dot-bounce {
+        0%,
+        60%,
+        100% {
+          opacity: 0.35;
+          transform: translateY(0);
+        }
+        30% {
+          opacity: 1;
+          transform: translateY(-5px);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .agent-chat-typing__dot {
+          animation: agent-chat-dot-pulse 1.4s ease-in-out infinite;
+          transform: none;
+        }
+
+        @keyframes agent-chat-dot-pulse {
+          0%,
+          100% {
+            opacity: 0.35;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+      }
+
+      @media (max-width: 900px) {
+        .vanguard-left-stack {
+          width: min(340px, calc(100vw - 24px));
+          max-width: none;
+          bottom: auto;
+          max-height: calc(100vh - 24px);
+        }
+
+        #agent-chat:not(.agent-chat--minimized) {
+          width: min(280px, calc(100vw - 360px));
+          max-width: none;
+          min-width: 0;
+        }
+      }
     </style>
 
     <!-- Import maps for modules -->
@@ -1128,13 +1750,14 @@
 
   </head>
   <body>
+    <div class="vanguard-left-stack">
     <!-- 🌞 UI Controls for Sun + Data -->
     <div id="controls">
       <header class="brand-block">
         <h1>VANGUARD</h1>
-        <p class="brand-tagline">Mars landing-site explorer — click the globe, then run a suitability prediction.</p>
+        <p class="brand-tagline">Explore Mars landing sites — click the globe, drape science layers, run suitability predictions.</p>
         <p class="flow-hint">
-          <strong>1.</strong> Click Mars &nbsp;·&nbsp; <strong>2.</strong> Check the readings &nbsp;·&nbsp;
+          <strong>1.</strong> Click Mars &nbsp;·&nbsp; <strong>2.</strong> Load rasters here &nbsp;·&nbsp;
           <strong>3.</strong> Predict
         </p>
       </header>
@@ -1159,8 +1782,7 @@
           </label>
           <p class="overlay-toggle-hint" id="landingOverlayStatus" aria-live="polite"></p>
           <p class="overlay-toggle-foot">
-            GPU-downscaled and ~55% blended with the base Mars photo. <strong>Globe surface (GeoTIFF)</strong> below is
-            disabled while this overlay is on.
+            GPU-downscaled and ~55% blended with the base Mars photo. Selecting a globe layer below turns this overlay off.
           </p>
           <div id="landingOverlayLegend" class="landing-overlay-legend" aria-hidden="true"></div>
         </div>
@@ -1169,10 +1791,24 @@
       <section class="panel-section" aria-label="Globe surface">
         <div class="panel-section-title">Globe surface (GeoTIFF)</div>
         <div class="control-card globe-surface-card">
-          <label class="globe-surface-label" for="globeSurfaceLayer">Layer on the globe</label>
-          <select id="globeSurfaceLayer" class="globe-surface-select" aria-label="Drape a raster on the Mars globe">
-            <option value="photo">Mars photo (default)</option>
-          </select>
+          <span class="globe-surface-label" id="globeSurfacePickerLabel">Layer on the globe</span>
+          <div class="vg-picker" id="globeSurfacePicker">
+            <button
+              type="button"
+              class="vg-picker__trigger"
+              id="globeSurfacePickerTrigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="globeSurfacePickerMenu"
+            >
+              <span class="vg-picker__label" id="globeSurfacePickerValue">Mars photo (default)</span>
+              <span class="vg-picker__chevron" aria-hidden="true">▾</span>
+            </button>
+            <ul class="vg-picker__menu" id="globeSurfacePickerMenu" role="listbox" hidden></ul>
+            <select id="globeSurfaceLayer" class="globe-surface-select" aria-hidden="true" tabindex="-1">
+              <option value="photo">Mars photo (default)</option>
+            </select>
+          </div>
           <p class="overlay-toggle-hint" id="globeSurfaceStatus" aria-live="polite"></p>
           <div id="globeRasterLegend" class="landing-overlay-legend" aria-hidden="true"></div>
         </div>
@@ -1182,8 +1818,8 @@
         <div class="panel-section-title">Values at this click</div>
         <div id="coords" class="coords--empty">
           <span class="coords-placeholder"
-            >Click Mars or enter latitude / longitude below. Raster values for that point will show here (all layers load
-            on first use).</span
+            >Click Mars to pick a point (values show as — until you load). Use “Load rasters here” to fetch all
+            GeoTIFF samples, or pick a layer in Globe surface to drape one overlay.</span
           >
         </div>
         <div class="famous-sites-block" aria-label="Famous Mars locations">
@@ -1193,8 +1829,7 @@
             <option value="">— Select a landing or science site —</option>
           </select>
           <p class="overlay-toggle-hint">
-            Fills latitude / longitude, frames the globe, and loads rasters at that point so you can run landing
-            suitability.
+            Fills latitude / longitude and frames the globe. Click “Load rasters here” to fetch values at that site.
           </p>
         </div>
         <div class="manual-coords" aria-label="Manual coordinates">
@@ -1232,16 +1867,73 @@
 
       <section class="panel-section" aria-label="Prediction">
         <div class="panel-section-title">Landing prediction</div>
+        <details class="scoring-weights-panel" id="scoringWeightsPanel">
+          <summary class="scoring-weights-panel__summary">Scoring weights (customize)</summary>
+          <p class="scoring-weights-panel__lede">
+            Adjust how much each property affects the landing %. Values are percents; they are normalized to sum to 100.
+            Defaults follow NASA/JPL research weights in <code>LANDING_SCORING_SOURCES.md</code>.
+          </p>
+          <div class="scoring-weights-grid" role="group" aria-label="Scoring weight percents">
+            <label class="scoring-weights-field">Slope <input type="number" id="weightSlope" min="0" max="100" step="1" value="30" /></label>
+            <label class="scoring-weights-field">Dust <input type="number" id="weightDust" min="0" max="100" step="1" value="20" /></label>
+            <label class="scoring-weights-field">Surface temp <input type="number" id="weightSurfaceTemp" min="0" max="100" step="1" value="20" /></label>
+            <label class="scoring-weights-field">Thermal inertia <input type="number" id="weightThermalInertia" min="0" max="100" step="1" value="20" /></label>
+            <label class="scoring-weights-field">Water <input type="number" id="weightWater" min="0" max="100" step="1" value="10" /></label>
+          </div>
+          <p class="scoring-weights-sum" id="scoringWeightsSum" aria-live="polite">Total: 100%</p>
+          <div class="scoring-weights-actions">
+            <button type="button" class="btn-secondary" id="resetScoringWeights">Reset to research defaults</button>
+          </div>
+        </details>
         <p class="predict-hint" id="apiModelsStatus" aria-live="polite">
           Checking ML API (Keras + XGBoost on server)…
         </p>
         <button type="button" id="predictLanding" style="display: none;">Run landing suitability</button>
         <p class="predict-hint" id="predictHint" style="display: none">
-          Uses neural models plus XGBoost where available. The table compares rasters you sampled to model outputs.
+          Requires loaded rasters at the selected point. Uses neural models plus XGBoost where available.
         </p>
         <div id="landingScore"></div>
       </section>
     </div>
+
+    <div id="mapLegendFloat" class="map-legend-float" aria-hidden="true"></div>
+    </div>
+
+    <aside id="agent-chat" class="agent-chat" aria-label="Mars assistant chat">
+      <button type="button" id="agentChatToggle" aria-expanded="true" title="Open Mars assistant">
+        <span aria-hidden="true">◀</span>
+        <span>Assistant</span>
+      </button>
+      <div class="agent-chat-panel">
+        <header class="agent-chat-header">
+          <h2>MARS ASSISTANT</h2>
+          <div class="agent-chat-header-actions">
+            <button
+              type="button"
+              id="agentChatMinimize"
+              class="agent-chat-icon-btn"
+              title="Minimize chat"
+              aria-label="Minimize chat"
+            >
+              −
+            </button>
+          </div>
+        </header>
+        <div id="agentChatMessages" role="log" aria-live="polite" aria-relevant="additions"></div>
+        <footer class="agent-chat-footer">
+          <form id="agentChatForm">
+            <textarea
+              id="agentChatInput"
+              rows="2"
+              placeholder="Ask about sites, coordinates, or scores…"
+              aria-label="Message to Mars assistant"
+            ></textarea>
+            <button type="submit" id="agentChatSend">Send</button>
+          </form>
+          <p class="agent-chat-status" id="agentChatStatus" aria-live="polite"></p>
+        </footer>
+      </div>
+    </aside>
 
     <!--
       Third-party map / globe API keys (Google Maps JS, Mapbox GL, Cesium ion, etc.):
@@ -1256,6 +1948,7 @@
     <!-- Load GeoTIFF as global -->
     <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     <!-- Your Three.js script -->
-    <script type="module" src="index.js?v=17"></script>
+    <link rel="stylesheet" href="vanguard-ui.css?v=1" />
+    <script type="module" src="index.js?v=23"></script>
   </body>
 </html>
