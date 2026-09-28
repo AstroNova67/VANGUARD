@@ -6,6 +6,12 @@
     <!-- Optional: set to e.g. http://127.0.0.1:5002 when the page is not served by Flask (live-server). -->
     <meta name="vanguard-api-base" content="" />
     <title>VANGUARD — Mars landing analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔴</text></svg>">
     <style>
       *,
@@ -25,12 +31,10 @@
         margin: 0;
         overflow: hidden; /* keep canvas fullscreen */
         font-family:
+          "DM Sans",
           system-ui,
           -apple-system,
           "Segoe UI",
-          Roboto,
-          "Helvetica Neue",
-          Arial,
           sans-serif;
         color: #e8f0f7;
         -webkit-font-smoothing: antialiased;
@@ -96,10 +100,13 @@
 
       #controls h1 {
         margin: 0;
-        font-size: 15px;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        color: #9fd4ff;
+        font-family: "DM Sans", system-ui, sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #f2f7fb;
+        line-height: 1.15;
+        text-transform: uppercase;
       }
 
       .brand-tagline {
@@ -142,6 +149,21 @@
         color: #6a9aba;
         margin-bottom: 8px;
       }
+
+      .control-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 14px;
+        padding: 10px 12px;
+        background: rgba(0, 0, 0, 0.22);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .gap-fill-delta-pos { color: #7dcea0; }
+      .gap-fill-delta-neg { color: #e8a090; }
+      .gap-fill-delta-zero { color: #8a9aaa; }
 
       .control-card {
         display: flex;
@@ -861,6 +883,46 @@
         border-radius: 10px;
         background: rgba(0, 0, 0, 0.35);
         border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .pred-gap-compare {
+        margin: 10px 0 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(158, 201, 232, 0.28);
+        background: rgba(20, 40, 58, 0.65);
+      }
+
+      .pred-gap-compare__row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: #a8c4d8;
+        padding: 2px 0;
+      }
+
+      .pred-gap-compare__row--delta {
+        margin-top: 4px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        font-weight: 600;
+      }
+
+      .pred-gap-compare__label {
+        color: #8aa8bc;
+      }
+
+      .pred-gap-compare__value {
+        font-variant-numeric: tabular-nums;
+        color: #e8f2fa;
+      }
+
+      .pred-gap-compare--missing {
+        margin: 10px 0 12px;
+        font-size: 11px;
+        color: #8aa8bc;
       }
 
       .pred-lead {
@@ -1755,85 +1817,29 @@
     <div id="controls">
       <header class="brand-block">
         <h1>VANGUARD</h1>
-        <p class="brand-tagline">Explore Mars landing sites — click the globe, drape science layers, run suitability predictions.</p>
-        <p class="flow-hint">
-          <strong>1.</strong> Click Mars &nbsp;·&nbsp; <strong>2.</strong> Load rasters here &nbsp;·&nbsp;
-          <strong>3.</strong> Predict
-        </p>
+        <p class="brand-tagline">Click Mars → layers load → run a landing score.</p>
       </header>
 
-      <section class="panel-section" aria-label="Scene">
-        <div class="panel-section-title">Scene</div>
-        <div class="control-card">
-          <button type="button" class="btn-secondary" id="toggleSun">Pause / resume sun</button>
-          <div class="sun-row">
-            <label for="sunAngle">Sun angle</label>
-            <input id="sunAngle" type="range" min="0" max="360" value="0" aria-label="Sun angle" />
-          </div>
+      <section class="panel-section" aria-label="Pick a place">
+        <div class="panel-section-title">Place</div>
+        <div id="placeEmptyGuide" class="coords-empty-guide">
+          <p class="coords-empty-guide__lead">Click the globe, jump to a famous site, or try the Hellas gap-fill demo.</p>
+          <button type="button" class="btn-secondary" id="demoHellasBtn">
+            Demo: Hellas (gap-fill Δ)
+          </button>
         </div>
-      </section>
-
-      <section class="panel-section" aria-label="Global batch map overlay">
-        <div class="panel-section-title">Global batch map overlay</div>
-        <div class="control-card overlay-toggle-card ml-suitability-overlay-card">
-          <label class="overlay-toggle" for="landingMlOverlayToggle">
-            <input type="checkbox" id="landingMlOverlayToggle" aria-label="Show ML suitability GeoTIFF on the globe" />
-            <span>Show <code>mars_landing_suitability_ml.tif</code> (ML suitability, 0–100%)</span>
-          </label>
-          <p class="overlay-toggle-hint" id="landingOverlayStatus" aria-live="polite"></p>
-          <p class="overlay-toggle-foot">
-            GPU-downscaled and ~55% blended with the base Mars photo. Selecting a globe layer below turns this overlay off.
-          </p>
-          <div id="landingOverlayLegend" class="landing-overlay-legend" aria-hidden="true"></div>
-        </div>
-      </section>
-
-      <section class="panel-section" aria-label="Globe surface">
-        <div class="panel-section-title">Globe surface (GeoTIFF)</div>
-        <div class="control-card globe-surface-card">
-          <span class="globe-surface-label" id="globeSurfacePickerLabel">Layer on the globe</span>
-          <div class="vg-picker" id="globeSurfacePicker">
-            <button
-              type="button"
-              class="vg-picker__trigger"
-              id="globeSurfacePickerTrigger"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-              aria-controls="globeSurfacePickerMenu"
-            >
-              <span class="vg-picker__label" id="globeSurfacePickerValue">Mars photo (default)</span>
-              <span class="vg-picker__chevron" aria-hidden="true">▾</span>
-            </button>
-            <ul class="vg-picker__menu" id="globeSurfacePickerMenu" role="listbox" hidden></ul>
-            <select id="globeSurfaceLayer" class="globe-surface-select" aria-hidden="true" tabindex="-1">
-              <option value="photo">Mars photo (default)</option>
-            </select>
-          </div>
-          <p class="overlay-toggle-hint" id="globeSurfaceStatus" aria-live="polite"></p>
-          <div id="globeRasterLegend" class="landing-overlay-legend" aria-hidden="true"></div>
-        </div>
-      </section>
-
-      <section class="panel-section" aria-label="Sampled rasters">
-        <div class="panel-section-title">Values at this click</div>
-        <div id="coords" class="coords--empty">
-          <span class="coords-placeholder"
-            >Click Mars to pick a point (values show as — until you load). Use “Load rasters here” to fetch all
-            GeoTIFF samples, or pick a layer in Globe surface to drape one overlay.</span
-          >
+        <div id="placeSelectionSummary" class="place-selection" hidden>
+          <div class="place-selection__coords" id="placeSelectionCoords"></div>
+          <p class="place-selection__hint" id="placeSelectionHint">Sampling GeoTIFF layers…</p>
         </div>
         <div class="famous-sites-block" aria-label="Famous Mars locations">
-          <p class="manual-coords-title">Famous locations</p>
-          <label class="globe-surface-label" for="famousMarsSite">Jump to a site</label>
+          <label class="globe-surface-label" for="famousMarsSite">Famous locations</label>
           <select id="famousMarsSite" class="globe-surface-select" aria-label="Famous Mars location presets">
             <option value="">— Select a landing or science site —</option>
           </select>
-          <p class="overlay-toggle-hint">
-            Fills latitude / longitude and frames the globe. Click “Load rasters here” to fetch values at that site.
-          </p>
         </div>
         <div class="manual-coords" aria-label="Manual coordinates">
-          <p class="manual-coords-title">Enter coordinates</p>
+          <p class="manual-coords-title">Or enter coordinates</p>
           <div class="manual-coords-row">
             <div class="manual-coords-field">
               <label for="manualLat">Latitude (°)</label>
@@ -1858,15 +1864,51 @@
               />
             </div>
           </div>
-          <div class="manual-coords-actions">
-            <button type="button" class="btn-secondary" id="applyManualLatLon">Load rasters here</button>
-          </div>
+          <!-- Load rasters here button removed — auto-load on click / site / Enter -->
+          <p class="overlay-toggle-hint">Rasters load automatically. Press Enter after typing coords.</p>
           <p class="manual-coords-feedback" id="manualCoordsFeedback" role="status"></p>
         </div>
       </section>
 
-      <section class="panel-section" aria-label="Prediction">
-        <div class="panel-section-title">Landing prediction</div>
+      <section class="panel-section" aria-label="Layers at this point">
+        <div class="panel-section-title">Layers at this point</div>
+        <div class="control-card globe-surface-card">
+          <span class="globe-surface-label" id="globeSurfacePickerLabel">Drape on globe</span>
+          <div class="vg-picker" id="globeSurfacePicker">
+            <button
+              type="button"
+              class="vg-picker__trigger"
+              id="globeSurfacePickerTrigger"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="globeSurfacePickerMenu"
+            >
+              <span class="vg-picker__label" id="globeSurfacePickerValue">Mars photo (default)</span>
+              <span class="vg-picker__chevron" aria-hidden="true">▾</span>
+            </button>
+            <ul class="vg-picker__menu" id="globeSurfacePickerMenu" role="listbox" hidden></ul>
+            <select id="globeSurfaceLayer" class="globe-surface-select" aria-hidden="true" tabindex="-1">
+              <option value="photo">Mars photo (default)</option>
+            </select>
+          </div>
+          <p class="overlay-toggle-hint" id="globeSurfaceStatus" aria-live="polite"></p>
+          <div id="globeRasterLegend" class="landing-overlay-legend" aria-hidden="true"></div>
+        </div>
+        <div id="coords" class="coords coords--empty" aria-live="polite">
+          <span class="coords-placeholder">Click a place on Mars to sample layers here.</span>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-label="Landing prediction">
+        <div class="panel-section-title">Score</div>
+        <p class="predict-hint" id="apiModelsStatus" aria-live="polite">
+          Checking ML API (Keras + XGBoost on server)…
+        </p>
+        <button type="button" id="predictLanding" style="display: none;">Run landing suitability</button>
+        <p class="predict-hint" id="predictHint" style="display: none">
+          Compares no fill / IDW / ML scores at this point (A · B · C).
+        </p>
+        <div id="landingScore"></div>
         <details class="scoring-weights-panel" id="scoringWeightsPanel">
           <summary class="scoring-weights-panel__summary">Scoring weights (customize)</summary>
           <p class="scoring-weights-panel__lede">
@@ -1885,16 +1927,49 @@
             <button type="button" class="btn-secondary" id="resetScoringWeights">Reset to research defaults</button>
           </div>
         </details>
-        <p class="predict-hint" id="apiModelsStatus" aria-live="polite">
-          Checking ML API (Keras + XGBoost on server)…
-        </p>
-        <button type="button" id="predictLanding" style="display: none;">Run landing suitability</button>
-        <p class="predict-hint" id="predictHint" style="display: none">
-          Requires loaded rasters at the selected point. Uses neural models plus XGBoost where available.
-        </p>
-        <div id="landingScore"></div>
       </section>
+
+      <details class="more-tools" id="moreToolsPanel">
+        <summary class="more-tools__summary">More tools</summary>
+        <div class="more-tools__body">
+          <section class="panel-section" aria-label="Scene">
+            <div class="panel-section-title">Scene</div>
+            <div class="control-card">
+              <div class="sun-toggle-row">
+                <label class="sun-orbit-toggle" for="toggleSun">
+                  <input type="checkbox" id="toggleSun" checked aria-describedby="sunOrbitState" />
+                  <span class="sun-orbit-toggle__track" aria-hidden="true"></span>
+                  <span class="sun-orbit-toggle__text">
+                    <span class="sun-orbit-toggle__title">Sun orbit</span>
+                    <span class="sun-orbit-toggle__state" id="sunOrbitState">Orbiting</span>
+                  </span>
+                </label>
+              </div>
+              <div class="sun-row">
+                <label for="sunAngle">Sun angle</label>
+                <input id="sunAngle" type="range" min="0" max="360" value="0" aria-label="Sun angle" />
+              </div>
+            </div>
+          </section>
+          <section class="panel-section" aria-label="Global batch map overlay">
+            <div class="panel-section-title">Global batch map overlay</div>
+            <div class="control-card overlay-toggle-card ml-suitability-overlay-card">
+              <label class="overlay-toggle" for="landingMlOverlayToggle">
+                <input type="checkbox" id="landingMlOverlayToggle" aria-label="Show ML suitability GeoTIFF on the globe" />
+                <span>Show <code>mars_landing_suitability_ml.tif</code> (ML suitability, 0–100%)</span>
+              </label>
+              <p class="overlay-toggle-hint" id="landingOverlayStatus" aria-live="polite"></p>
+              <p class="overlay-toggle-foot">
+                GPU-downscaled and ~55% blended with the base Mars photo. Selecting a globe layer turns this off.
+              </p>
+              <div id="landingOverlayLegend" class="landing-overlay-legend" aria-hidden="true"></div>
+            </div>
+          </section>
+        </div>
+      </details>
     </div>
+
+    <div id="scoreFloat" class="score-float" hidden aria-live="polite"></div>
 
     <div id="mapLegendFloat" class="map-legend-float" aria-hidden="true"></div>
     </div>
@@ -1948,7 +2023,7 @@
     <!-- Load GeoTIFF as global -->
     <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     <!-- Your Three.js script -->
-    <link rel="stylesheet" href="vanguard-ui.css?v=1" />
-    <script type="module" src="index.js?v=23"></script>
+    <link rel="stylesheet" href="vanguard-ui.css?v=3" />
+    <script type="module" src="index.js?v=29"></script>
   </body>
 </html>

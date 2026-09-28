@@ -10,7 +10,7 @@ import rasterio
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BACKEND_DIR)
-DATA_DIR = os.path.join(PROJECT_ROOT, "frontend", "3d_globe", "public", "data")
+DATA_DIR = os.path.join(PROJECT_ROOT, "frontend", "3d_globe", "public", "data_gap_filled")
 
 # marsDataKey → filename (matches frontend/3d_globe/index.js marsDatasets)
 RASTER_LAYERS: tuple[tuple[str, str], ...] = (

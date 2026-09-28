@@ -1,0 +1,85 @@
+{
+  "source": "/Users/eshaankhare/Downloads/Mars Geoscience",
+  "output": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data_gap_filled",
+  "fill_method": "idw_gaussian",
+  "params": {
+    "K_NEIGHBORS": 24,
+    "GAUSS_SIGMA": 6.0,
+    "FEATHER_PX": 20
+  },
+  "filled_layers": [
+    {
+      "src": "omega_ferric_nnphs.tif",
+      "dst": "omega_ferric_nnphs.tif",
+      "filled": 122766,
+      "remaining_zeros": 0,
+      "pct": 14.589156351605727,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.26
+    },
+    {
+      "src": "omega_albedo_r1080.tif",
+      "dst": "omega_albedo_r1080.tif",
+      "filled": 11796,
+      "remaining_zeros": 0,
+      "pct": 1.401802521248075,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.15
+    },
+    {
+      "src": "mola_roughness_0.6km_numeric.tif",
+      "dst": "mola_roughness_0.6km_numeric.tif",
+      "filled": 43626,
+      "remaining_zeros": 0,
+      "pct": 5.1843876561519595,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.2
+    },
+    {
+      "src": "mars_yearly_temperature_range_v1.0.tif",
+      "dst": "mars_yearly_temperature_range_v1.0.tif",
+      "filled": 26932,
+      "remaining_zeros": 0,
+      "pct": 3.200520981879718,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.14
+    },
+    {
+      "src": "mola_hrsc_blend_topo_v2.tif",
+      "dst": "MOLA_128ppd_topo.tif",
+      "filled": 51,
+      "remaining_zeros": 0,
+      "pct": 0.006060692487593406,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.26
+    }
+  ],
+  "copied_unfilled": [
+    "mola_hrsc_blend_slope_v2.tif",
+    "mars_yearly_avg_temperature_celsius.tif",
+    "mars_crustal_thickness_gmm3_rm1.tif",
+    "mars_odyssey_grs_mons_perc_wt.tif",
+    "TES_Basalt_numeric.tif",
+    "omega_pyroxene_bd2000.tif"
+  ],
+  "kept_from_public": [
+    "TES_Lambert_Albedo_numeric.tif",
+    "tes_dayside_ti_putzig_2007.tif",
+    "mars_landing_suitability_ml.tif"
+  ]
+}

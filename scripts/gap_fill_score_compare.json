@@ -1,0 +1,1588 @@
+{
+  "unfilled_dir": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data_gap_unfilled",
+  "filled_dir": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data_gap_filled",
+  "ml_filled_dir": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data_gap_ml_filled",
+  "note": "A = unfilled zeros; B = IDW+gaussian (data_gap_filled); C = HistGradientBoosting gap imputers (data_gap_ml_filled). Same /predict pipeline for all three.",
+  "summary": {
+    "n_sites": 31,
+    "mean_delta_idw": -5.4796774193548385,
+    "mean_delta_ml": -5.629677419354839,
+    "mean_delta_ml_minus_idw": -0.15,
+    "mean_delta_idw_famous": -0.5546666666666668,
+    "mean_delta_ml_famous": -0.5800000000000001,
+    "mean_delta_idw_gap": -10.096874999999999,
+    "mean_delta_ml_gap": -10.36375,
+    "mean_delta": -5.4796774193548385,
+    "mean_delta_famous": -0.5546666666666668,
+    "mean_delta_gap_sites": -10.096874999999999,
+    "largest_jumps_ml": [
+      {
+        "id": "gap_-50.86_151.53",
+        "name": "Former gap (-50.86\u00b0N, 151.53\u00b0E)",
+        "kind": "gap",
+        "lat": -50.86436170212767,
+        "lon": 151.52815013404825,
+        "score_unfilled": 64.31,
+        "score_idw": 29.49,
+        "score_ml": 29.7,
+        "delta_idw": -34.82,
+        "delta_ml": -34.61,
+        "delta_ml_minus_idw": 0.21
+      },
+      {
+        "id": "gap_-79.11_-2.90",
+        "name": "Former gap (-79.11\u00b0N, -2.90\u00b0E)",
+        "kind": "gap",
+        "lat": -79.1090425531915,
+        "lon": -2.89544235924933,
+        "score_unfilled": 37.47,
+        "score_idw": 17.6,
+        "score_ml": 17.58,
+        "delta_idw": -19.87,
+        "delta_ml": -19.89,
+        "delta_ml_minus_idw": -0.02
+      },
+      {
+        "id": "gap_33.63_75.28",
+        "name": "Former gap (33.63\u00b0N, 75.28\u00b0E)",
+        "kind": "gap",
+        "lat": 33.630319148936174,
+        "lon": 75.28150134048258,
+        "score_unfilled": 58.48,
+        "score_idw": 35.43,
+        "score_ml": 38.98,
+        "delta_idw": -23.05,
+        "delta_ml": -19.5,
+        "delta_ml_minus_idw": 3.55
+      },
+      {
+        "id": "gap_-82.94_-127.08",
+        "name": "Former gap (-82.94\u00b0N, -127.08\u00b0E)",
+        "kind": "gap",
+        "lat": -82.93882978723406,
+        "lon": -127.07774798927613,
+        "score_unfilled": 34.6,
+        "score_idw": 17.96,
+        "score_ml": 17.75,
+        "delta_idw": -16.64,
+        "delta_ml": -16.85,
+        "delta_ml_minus_idw": -0.21
+      },
+      {
+        "id": "gap_-81.74_-63.06",
+        "name": "Former gap (-81.74\u00b0N, -63.06\u00b0E)",
+        "kind": "gap",
+        "lat": -81.74202127659575,
+        "lon": -63.05630026809652,
+        "score_unfilled": 32.94,
+        "score_idw": 16.59,
+        "score_ml": 16.57,
+        "delta_idw": -16.35,
+        "delta_ml": -16.37,
+        "delta_ml_minus_idw": -0.02
+      },
+      {
+        "id": "gap_-88.44_173.08",
+        "name": "Former gap (-88.44\u00b0N, 173.08\u00b0E)",
+        "kind": "gap",
+        "lat": -88.44414893617022,
+        "lon": 173.08310991957103,
+        "score_unfilled": 31.47,
+        "score_idw": 16.35,
+        "score_ml": 16.53,
+        "delta_idw": -15.12,
+        "delta_ml": -14.94,
+        "delta_ml_minus_idw": 0.18
+      },
+      {
+        "id": "gap_-13.76_-126.11",
+        "name": "Former gap (-13.76\u00b0N, -126.11\u00b0E)",
+        "kind": "gap",
+        "lat": -13.76329787234043,
+        "lon": -126.11260053619303,
+        "score_unfilled": 58.64,
+        "score_idw": 44.48,
+        "score_ml": 44.48,
+        "delta_idw": -14.16,
+        "delta_ml": -14.16,
+        "delta_ml_minus_idw": 0.0
+      },
+      {
+        "id": "gap_-85.09_126.76",
+        "name": "Former gap (-85.09\u00b0N, 126.76\u00b0E)",
+        "kind": "gap",
+        "lat": -85.09308510638297,
+        "lon": 126.75603217158175,
+        "score_unfilled": 44.11,
+        "score_idw": 30.13,
+        "score_ml": 30.19,
+        "delta_idw": -13.98,
+        "delta_ml": -13.92,
+        "delta_ml_minus_idw": 0.06
+      },
+      {
+        "id": "viking1",
+        "name": "Viking 1 (Chryse Planitia)",
+        "kind": "famous",
+        "lat": 22.4872,
+        "lon": -47.9424,
+        "score_unfilled": 57.33,
+        "score_idw": 45.78,
+        "score_ml": 45.79,
+        "delta_idw": -11.55,
+        "delta_ml": -11.54,
+        "delta_ml_minus_idw": 0.01
+      },
+      {
+        "id": "gap_-55.89_171.80",
+        "name": "Former gap (-55.89\u00b0N, 171.80\u00b0E)",
+        "kind": "gap",
+        "lat": -55.8909574468085,
+        "lon": 171.79624664879356,
+        "score_unfilled": 45.66,
+        "score_idw": 35.34,
+        "score_ml": 35.26,
+        "delta_idw": -10.32,
+        "delta_ml": -10.4,
+        "delta_ml_minus_idw": -0.08
+      }
+    ],
+    "largest_jumps": [
+      {
+        "id": "gap_-50.86_151.53",
+        "name": "Former gap (-50.86\u00b0N, 151.53\u00b0E)",
+        "kind": "gap",
+        "lat": -50.86436170212767,
+        "lon": 151.52815013404825,
+        "score_unfilled": 64.31,
+        "score_filled": 29.49,
+        "delta": -34.82
+      },
+      {
+        "id": "gap_33.63_75.28",
+        "name": "Former gap (33.63\u00b0N, 75.28\u00b0E)",
+        "kind": "gap",
+        "lat": 33.630319148936174,
+        "lon": 75.28150134048258,
+        "score_unfilled": 58.48,
+        "score_filled": 35.43,
+        "delta": -23.05
+      },
+      {
+        "id": "gap_-79.11_-2.90",
+        "name": "Former gap (-79.11\u00b0N, -2.90\u00b0E)",
+        "kind": "gap",
+        "lat": -79.1090425531915,
+        "lon": -2.89544235924933,
+        "score_unfilled": 37.47,
+        "score_filled": 17.6,
+        "delta": -19.87
+      },
+      {
+        "id": "gap_-82.94_-127.08",
+        "name": "Former gap (-82.94\u00b0N, -127.08\u00b0E)",
+        "kind": "gap",
+        "lat": -82.93882978723406,
+        "lon": -127.07774798927613,
+        "score_unfilled": 34.6,
+        "score_filled": 17.96,
+        "delta": -16.64
+      },
+      {
+        "id": "gap_-81.74_-63.06",
+        "name": "Former gap (-81.74\u00b0N, -63.06\u00b0E)",
+        "kind": "gap",
+        "lat": -81.74202127659575,
+        "lon": -63.05630026809652,
+        "score_unfilled": 32.94,
+        "score_filled": 16.59,
+        "delta": -16.35
+      },
+      {
+        "id": "gap_-88.44_173.08",
+        "name": "Former gap (-88.44\u00b0N, 173.08\u00b0E)",
+        "kind": "gap",
+        "lat": -88.44414893617022,
+        "lon": 173.08310991957103,
+        "score_unfilled": 31.47,
+        "score_filled": 16.35,
+        "delta": -15.12
+      },
+      {
+        "id": "gap_-13.76_-126.11",
+        "name": "Former gap (-13.76\u00b0N, -126.11\u00b0E)",
+        "kind": "gap",
+        "lat": -13.76329787234043,
+        "lon": -126.11260053619303,
+        "score_unfilled": 58.64,
+        "score_filled": 44.48,
+        "delta": -14.16
+      },
+      {
+        "id": "gap_-85.09_126.76",
+        "name": "Former gap (-85.09\u00b0N, 126.76\u00b0E)",
+        "kind": "gap",
+        "lat": -85.09308510638297,
+        "lon": 126.75603217158175,
+        "score_unfilled": 44.11,
+        "score_filled": 30.13,
+        "delta": -13.98
+      },
+      {
+        "id": "viking1",
+        "name": "Viking 1 (Chryse Planitia)",
+        "kind": "famous",
+        "lat": 22.4872,
+        "lon": -47.9424,
+        "score_unfilled": 57.33,
+        "score_filled": 45.78,
+        "delta": -11.55
+      },
+      {
+        "id": "gap_-55.89_171.80",
+        "name": "Former gap (-55.89\u00b0N, 171.80\u00b0E)",
+        "kind": "gap",
+        "lat": -55.8909574468085,
+        "lon": 171.79624664879356,
+        "score_unfilled": 45.66,
+        "score_filled": 35.34,
+        "delta": -10.32
+      }
+    ]
+  },
+  "sites": [
+    {
+      "id": "jezero",
+      "name": "Jezero crater (Perseverance)",
+      "kind": "famous",
+      "lat": 18.4447,
+      "lon": 77.4508,
+      "score_unfilled": 38.37,
+      "score_idw": 34.46,
+      "score_ml": 34.29,
+      "score_filled": 34.46,
+      "delta": -3.91,
+      "delta_idw": -3.91,
+      "delta_ml": -4.08,
+      "delta_ml_minus_idw": -0.17,
+      "layers_unfilled": {
+        "elevation": 331.0,
+        "albedo": 0.31722432374954224,
+        "roughness": 200.0,
+        "ferric": 1.0018768310546875,
+        "tempRange": 140.19699096679688
+      },
+      "layers_idw": {
+        "elevation": 331.0,
+        "albedo": 0.31530535221099854,
+        "roughness": 200.0,
+        "ferric": 0.9998598694801331,
+        "tempRange": 140.19699096679688
+      },
+      "layers_ml": {
+        "elevation": 331.0,
+        "albedo": 0.31577372550964355,
+        "roughness": 200.0,
+        "ferric": 0.9998916983604431,
+        "tempRange": 140.19699096679688
+      },
+      "layers_filled": {
+        "elevation": 331.0,
+        "albedo": 0.31530535221099854,
+        "roughness": 200.0,
+        "ferric": 0.9998598694801331,
+        "tempRange": 140.19699096679688
+      }
+    },
+    {
+      "id": "gale",
+      "name": "Gale crater (center)",
+      "kind": "famous",
+      "lat": -5.4,
+      "lon": 137.8,
+      "score_unfilled": 52.57,
+      "score_idw": 48.95,
+      "score_ml": 48.84,
+      "score_filled": 48.95,
+      "delta": -3.62,
+      "delta_idw": -3.62,
+      "delta_ml": -3.73,
+      "delta_ml_minus_idw": -0.11,
+      "layers_unfilled": {
+        "elevation": 647.0,
+        "albedo": 0.23838385939598083,
+        "roughness": 197.0,
+        "ferric": 0.9645938277244568,
+        "tempRange": 127.95098876953125
+      },
+      "layers_idw": {
+        "elevation": 647.0,
+        "albedo": 0.25762563943862915,
+        "roughness": 197.0,
+        "ferric": 0.97576504945755,
+        "tempRange": 127.95098876953125
+      },
+      "layers_ml": {
+        "elevation": 647.0,
+        "albedo": 0.25724658370018005,
+        "roughness": 197.0,
+        "ferric": 0.976189911365509,
+        "tempRange": 127.95098876953125
+      },
+      "layers_filled": {
+        "elevation": 647.0,
+        "albedo": 0.25762563943862915,
+        "roughness": 197.0,
+        "ferric": 0.97576504945755,
+        "tempRange": 127.95098876953125
+      }
+    },
+    {
+      "id": "curiosity",
+      "name": "Curiosity landing site (Gale)",
+      "kind": "famous",
+      "lat": -5.5892,
+      "lon": 137.4417,
+      "score_unfilled": 47.55,
+      "score_idw": 44.78,
+      "score_ml": 44.68,
+      "score_filled": 44.78,
+      "delta": -2.77,
+      "delta_idw": -2.77,
+      "delta_ml": -2.87,
+      "delta_ml_minus_idw": -0.1,
+      "layers_unfilled": {
+        "elevation": 807.0,
+        "albedo": 0.25107210874557495,
+        "roughness": 160.0,
+        "ferric": 0.968177080154419,
+        "tempRange": 124.9010009765625
+      },
+      "layers_idw": {
+        "elevation": 807.0,
+        "albedo": 0.25855928659439087,
+        "roughness": 160.0,
+        "ferric": 0.9762650728225708,
+        "tempRange": 124.9010009765625
+      },
+      "layers_ml": {
+        "elevation": 807.0,
+        "albedo": 0.2582290470600128,
+        "roughness": 160.0,
+        "ferric": 0.9768497347831726,
+        "tempRange": 124.9010009765625
+      },
+      "layers_filled": {
+        "elevation": 807.0,
+        "albedo": 0.25855928659439087,
+        "roughness": 160.0,
+        "ferric": 0.9762650728225708,
+        "tempRange": 124.9010009765625
+      }
+    },
+    {
+      "id": "meridiani",
+      "name": "Meridiani Planum (Opportunity)",
+      "kind": "famous",
+      "lat": -1.9462,
+      "lon": -5.5266,
+      "score_unfilled": 64.17,
+      "score_idw": 64.17,
+      "score_ml": 64.17,
+      "score_filled": 64.17,
+      "delta": 0.0,
+      "delta_idw": 0.0,
+      "delta_ml": 0.0,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": -1330.0,
+        "albedo": 0.16435673832893372,
+        "roughness": 104.0,
+        "ferric": 0.9479281902313232,
+        "tempRange": 123.65400695800781
+      },
+      "layers_idw": {
+        "elevation": -1330.0,
+        "albedo": 0.16435673832893372,
+        "roughness": 104.0,
+        "ferric": 0.9479281902313232,
+        "tempRange": 123.65400695800781
+      },
+      "layers_ml": {
+        "elevation": -1330.0,
+        "albedo": 0.16435673832893372,
+        "roughness": 104.0,
+        "ferric": 0.9479281902313232,
+        "tempRange": 123.65400695800781
+      },
+      "layers_filled": {
+        "elevation": -1330.0,
+        "albedo": 0.16435673832893372,
+        "roughness": 104.0,
+        "ferric": 0.9479281902313232,
+        "tempRange": 123.65400695800781
+      }
+    },
+    {
+      "id": "gusev",
+      "name": "Gusev crater (Spirit)",
+      "kind": "famous",
+      "lat": -14.5689,
+      "lon": 175.4726,
+      "score_unfilled": 45.81,
+      "score_idw": 49.1,
+      "score_ml": 49.1,
+      "score_filled": 49.1,
+      "delta": 3.29,
+      "delta_idw": 3.29,
+      "delta_ml": 3.29,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": 1744.0,
+        "albedo": 0.23503617942333221,
+        "roughness": 185.0,
+        "ferric": 0.9569437503814697,
+        "tempRange": 132.32101440429688
+      },
+      "layers_idw": {
+        "elevation": 1744.0,
+        "albedo": 0.22284497320652008,
+        "roughness": 185.0,
+        "ferric": 0.9559255242347717,
+        "tempRange": 132.32101440429688
+      },
+      "layers_ml": {
+        "elevation": 1744.0,
+        "albedo": 0.22281689941883087,
+        "roughness": 185.0,
+        "ferric": 0.956041693687439,
+        "tempRange": 132.32101440429688
+      },
+      "layers_filled": {
+        "elevation": 1744.0,
+        "albedo": 0.22284497320652008,
+        "roughness": 185.0,
+        "ferric": 0.9559255242347717,
+        "tempRange": 132.32101440429688
+      }
+    },
+    {
+      "id": "viking1",
+      "name": "Viking 1 (Chryse Planitia)",
+      "kind": "famous",
+      "lat": 22.4872,
+      "lon": -47.9424,
+      "score_unfilled": 57.33,
+      "score_idw": 45.78,
+      "score_ml": 45.79,
+      "score_filled": 45.78,
+      "delta": -11.55,
+      "delta_idw": -11.55,
+      "delta_ml": -11.54,
+      "delta_ml_minus_idw": 0.01,
+      "layers_unfilled": {
+        "elevation": -3961.0,
+        "albedo": 0.21267808973789215,
+        "roughness": 126.0,
+        "ferric": 0.9606035947799683,
+        "tempRange": 133.94900512695312
+      },
+      "layers_idw": {
+        "elevation": -3961.0,
+        "albedo": 0.21038299798965454,
+        "roughness": 126.0,
+        "ferric": 0.9628287553787231,
+        "tempRange": 133.94900512695312
+      },
+      "layers_ml": {
+        "elevation": -3961.0,
+        "albedo": 0.21045789122581482,
+        "roughness": 126.0,
+        "ferric": 0.9630119800567627,
+        "tempRange": 133.94900512695312
+      },
+      "layers_filled": {
+        "elevation": -3961.0,
+        "albedo": 0.21038299798965454,
+        "roughness": 126.0,
+        "ferric": 0.9628287553787231,
+        "tempRange": 133.94900512695312
+      }
+    },
+    {
+      "id": "viking2",
+      "name": "Viking 2 (Utopia Planitia)",
+      "kind": "famous",
+      "lat": 47.967,
+      "lon": 134.991,
+      "score_unfilled": 42.61,
+      "score_idw": 42.58,
+      "score_ml": 42.57,
+      "score_filled": 42.58,
+      "delta": -0.03,
+      "delta_idw": -0.03,
+      "delta_ml": -0.04,
+      "delta_ml_minus_idw": -0.01,
+      "layers_unfilled": {
+        "elevation": -4923.0,
+        "albedo": 0.1933334469795227,
+        "roughness": 133.0,
+        "ferric": 0.9804747104644775,
+        "tempRange": 127.78500366210938
+      },
+      "layers_idw": {
+        "elevation": -4923.0,
+        "albedo": 0.19380679726600647,
+        "roughness": 133.0,
+        "ferric": 0.9798919558525085,
+        "tempRange": 127.78500366210938
+      },
+      "layers_ml": {
+        "elevation": -4923.0,
+        "albedo": 0.19381263852119446,
+        "roughness": 133.0,
+        "ferric": 0.9796842336654663,
+        "tempRange": 127.78500366210938
+      },
+      "layers_filled": {
+        "elevation": -4923.0,
+        "albedo": 0.19380679726600647,
+        "roughness": 133.0,
+        "ferric": 0.9798919558525085,
+        "tempRange": 127.78500366210938
+      }
+    },
+    {
+      "id": "insight",
+      "name": "Elysium Planitia (InSight)",
+      "kind": "famous",
+      "lat": 4.5024,
+      "lon": 135.6234,
+      "score_unfilled": 47.79,
+      "score_idw": 48.22,
+      "score_ml": 48.23,
+      "score_filled": 48.22,
+      "delta": 0.43,
+      "delta_idw": 0.43,
+      "delta_ml": 0.44,
+      "delta_ml_minus_idw": 0.01,
+      "layers_unfilled": {
+        "elevation": -1114.0,
+        "albedo": 0.3621005713939667,
+        "roughness": 152.0,
+        "ferric": 1.0057146549224854,
+        "tempRange": 102.46501159667969
+      },
+      "layers_idw": {
+        "elevation": -1114.0,
+        "albedo": 0.35896968841552734,
+        "roughness": 152.0,
+        "ferric": 1.0079216957092285,
+        "tempRange": 102.46501159667969
+      },
+      "layers_ml": {
+        "elevation": -1114.0,
+        "albedo": 0.3588736057281494,
+        "roughness": 152.0,
+        "ferric": 1.0078340768814087,
+        "tempRange": 102.46501159667969
+      },
+      "layers_filled": {
+        "elevation": -1114.0,
+        "albedo": 0.35896968841552734,
+        "roughness": 152.0,
+        "ferric": 1.0079216957092285,
+        "tempRange": 102.46501159667969
+      }
+    },
+    {
+      "id": "pathfinder",
+      "name": "Ares Vallis (Pathfinder)",
+      "kind": "famous",
+      "lat": 19.3278,
+      "lon": -33.5441,
+      "score_unfilled": 49.0,
+      "score_idw": 49.0,
+      "score_ml": 49.0,
+      "score_filled": 49.0,
+      "delta": 0.0,
+      "delta_idw": 0.0,
+      "delta_ml": 0.0,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": -3180.0,
+        "albedo": 0.22172251343727112,
+        "roughness": 139.0,
+        "ferric": 0.975525975227356,
+        "tempRange": 135.07199096679688
+      },
+      "layers_idw": {
+        "elevation": -3180.0,
+        "albedo": 0.22172251343727112,
+        "roughness": 139.0,
+        "ferric": 0.975525975227356,
+        "tempRange": 135.07199096679688
+      },
+      "layers_ml": {
+        "elevation": -3180.0,
+        "albedo": 0.22172251343727112,
+        "roughness": 139.0,
+        "ferric": 0.975525975227356,
+        "tempRange": 135.07199096679688
+      },
+      "layers_filled": {
+        "elevation": -3180.0,
+        "albedo": 0.22172251343727112,
+        "roughness": 139.0,
+        "ferric": 0.975525975227356,
+        "tempRange": 135.07199096679688
+      }
+    },
+    {
+      "id": "phoenix",
+      "name": "Green Valley (Phoenix)",
+      "kind": "famous",
+      "lat": 68.2188,
+      "lon": -125.7497,
+      "score_unfilled": 40.07,
+      "score_idw": 40.07,
+      "score_ml": 40.07,
+      "score_filled": 40.07,
+      "delta": 0.0,
+      "delta_idw": 0.0,
+      "delta_ml": 0.0,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": -4327.0,
+        "albedo": 0.3018289804458618,
+        "roughness": 113.0,
+        "ferric": 1.0079188346862793,
+        "tempRange": 106.7550048828125
+      },
+      "layers_idw": {
+        "elevation": -4327.0,
+        "albedo": 0.3010433614253998,
+        "roughness": 113.0,
+        "ferric": 1.0071402788162231,
+        "tempRange": 106.7550048828125
+      },
+      "layers_ml": {
+        "elevation": -4327.0,
+        "albedo": 0.3010433316230774,
+        "roughness": 113.0,
+        "ferric": 1.0071418285369873,
+        "tempRange": 106.7550048828125
+      },
+      "layers_filled": {
+        "elevation": -4327.0,
+        "albedo": 0.3010433614253998,
+        "roughness": 113.0,
+        "ferric": 1.0071402788162231,
+        "tempRange": 106.7550048828125
+      }
+    },
+    {
+      "id": "olympus",
+      "name": "Olympus Mons (caldera)",
+      "kind": "famous",
+      "lat": 18.65,
+      "lon": -133.8,
+      "score_unfilled": 32.85,
+      "score_idw": 32.88,
+      "score_ml": 32.88,
+      "score_filled": 32.88,
+      "delta": 0.03,
+      "delta_idw": 0.03,
+      "delta_ml": 0.03,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": 2033.0,
+        "albedo": 0.4361799359321594,
+        "roughness": 137.0,
+        "ferric": 1.010525107383728,
+        "tempRange": 138.83200073242188
+      },
+      "layers_idw": {
+        "elevation": 2033.0,
+        "albedo": 0.43542513251304626,
+        "roughness": 137.0,
+        "ferric": 1.0124305486679077,
+        "tempRange": 138.83200073242188
+      },
+      "layers_ml": {
+        "elevation": 2033.0,
+        "albedo": 0.43542516231536865,
+        "roughness": 137.0,
+        "ferric": 1.0124343633651733,
+        "tempRange": 138.83200073242188
+      },
+      "layers_filled": {
+        "elevation": 2033.0,
+        "albedo": 0.43542513251304626,
+        "roughness": 137.0,
+        "ferric": 1.0124305486679077,
+        "tempRange": 138.83200073242188
+      }
+    },
+    {
+      "id": "valles",
+      "name": "Valles Marineris (Coprates vicinity)",
+      "kind": "famous",
+      "lat": -14.5,
+      "lon": -59.0,
+      "score_unfilled": 56.17,
+      "score_idw": 56.26,
+      "score_ml": 56.26,
+      "score_filled": 56.26,
+      "delta": 0.09,
+      "delta_idw": 0.09,
+      "delta_ml": 0.09,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": -3813.0,
+        "albedo": 0.16531839966773987,
+        "roughness": 212.0,
+        "ferric": 0.9436442852020264,
+        "tempRange": 120.19398498535156
+      },
+      "layers_idw": {
+        "elevation": -3813.0,
+        "albedo": 0.16531839966773987,
+        "roughness": 212.0,
+        "ferric": 0.9455565810203552,
+        "tempRange": 120.19398498535156
+      },
+      "layers_ml": {
+        "elevation": -3813.0,
+        "albedo": 0.16531839966773987,
+        "roughness": 212.0,
+        "ferric": 0.9454715847969055,
+        "tempRange": 120.19398498535156
+      },
+      "layers_filled": {
+        "elevation": -3813.0,
+        "albedo": 0.16531839966773987,
+        "roughness": 212.0,
+        "ferric": 0.9455565810203552,
+        "tempRange": 120.19398498535156
+      }
+    },
+    {
+      "id": "hellas",
+      "name": "Hellas Planitia (basin center)",
+      "kind": "famous",
+      "lat": -42.0,
+      "lon": 70.0,
+      "score_unfilled": 34.53,
+      "score_idw": 44.24,
+      "score_ml": 44.23,
+      "score_filled": 44.24,
+      "delta": 9.71,
+      "delta_idw": 9.71,
+      "delta_ml": 9.7,
+      "delta_ml_minus_idw": -0.01,
+      "layers_unfilled": {
+        "elevation": -6433.0,
+        "albedo": 0.30211013555526733,
+        "roughness": 131.0,
+        "ferric": 0.0,
+        "tempRange": 150.7340087890625
+      },
+      "layers_idw": {
+        "elevation": -6433.0,
+        "albedo": 0.30211013555526733,
+        "roughness": 131.0,
+        "ferric": 0.9909120202064514,
+        "tempRange": 150.7340087890625
+      },
+      "layers_ml": {
+        "elevation": -6433.0,
+        "albedo": 0.30211013555526733,
+        "roughness": 131.0,
+        "ferric": 0.9906091690063477,
+        "tempRange": 150.7340087890625
+      },
+      "layers_filled": {
+        "elevation": -6433.0,
+        "albedo": 0.30211013555526733,
+        "roughness": 131.0,
+        "ferric": 0.9909120202064514,
+        "tempRange": 150.7340087890625
+      }
+    },
+    {
+      "id": "noctis",
+      "name": "Noctis Labyrinthus",
+      "kind": "famous",
+      "lat": -7.0,
+      "lon": -97.0,
+      "score_unfilled": 50.95,
+      "score_idw": 50.95,
+      "score_ml": 50.95,
+      "score_filled": 50.95,
+      "delta": 0.0,
+      "delta_idw": 0.0,
+      "delta_ml": 0.0,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": 4136.0,
+        "albedo": 0.2229607254266739,
+        "roughness": 184.0,
+        "ferric": 0.9716410636901855,
+        "tempRange": 136.44200134277344
+      },
+      "layers_idw": {
+        "elevation": 4136.0,
+        "albedo": 0.2229607254266739,
+        "roughness": 184.0,
+        "ferric": 0.9716410636901855,
+        "tempRange": 136.44200134277344
+      },
+      "layers_ml": {
+        "elevation": 4136.0,
+        "albedo": 0.2229607254266739,
+        "roughness": 184.0,
+        "ferric": 0.9716410636901855,
+        "tempRange": 136.44200134277344
+      },
+      "layers_filled": {
+        "elevation": 4136.0,
+        "albedo": 0.2229607254266739,
+        "roughness": 184.0,
+        "ferric": 0.9716410636901855,
+        "tempRange": 136.44200134277344
+      }
+    },
+    {
+      "id": "ascraeus",
+      "name": "Ascraeus Mons",
+      "kind": "famous",
+      "lat": 11.2,
+      "lon": -104.1,
+      "score_unfilled": 41.55,
+      "score_idw": 41.56,
+      "score_ml": 41.56,
+      "score_filled": 41.56,
+      "delta": 0.01,
+      "delta_idw": 0.01,
+      "delta_ml": 0.01,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": -249.0,
+        "albedo": 0.4234851896762848,
+        "roughness": 140.0,
+        "ferric": 1.0235708951950073,
+        "tempRange": 141.73300170898438
+      },
+      "layers_idw": {
+        "elevation": -248.79815673828125,
+        "albedo": 0.4234287142753601,
+        "roughness": 140.0,
+        "ferric": 1.0235708951950073,
+        "tempRange": 141.73300170898438
+      },
+      "layers_ml": {
+        "elevation": -248.7974853515625,
+        "albedo": 0.42342856526374817,
+        "roughness": 140.0,
+        "ferric": 1.0235708951950073,
+        "tempRange": 141.73300170898438
+      },
+      "layers_filled": {
+        "elevation": -248.79815673828125,
+        "albedo": 0.4234287142753601,
+        "roughness": 140.0,
+        "ferric": 1.0235708951950073,
+        "tempRange": 141.73300170898438
+      }
+    },
+    {
+      "id": "gap_33.63_75.28",
+      "name": "Former gap (33.63\u00b0N, 75.28\u00b0E)",
+      "kind": "gap",
+      "lat": 33.630319148936174,
+      "lon": 75.28150134048258,
+      "score_unfilled": 58.48,
+      "score_idw": 35.43,
+      "score_ml": 38.98,
+      "score_filled": 35.43,
+      "delta": -23.05,
+      "delta_idw": -23.05,
+      "delta_ml": -19.5,
+      "delta_ml_minus_idw": 3.55,
+      "layers_unfilled": {
+        "elevation": -1329.0,
+        "albedo": 0.0,
+        "roughness": 196.0,
+        "ferric": 0.0,
+        "tempRange": 130.10000610351562
+      },
+      "layers_idw": {
+        "elevation": -1329.0,
+        "albedo": 0.37782084941864014,
+        "roughness": 196.0,
+        "ferric": 1.0139412879943848,
+        "tempRange": 130.10000610351562
+      },
+      "layers_ml": {
+        "elevation": -1329.0,
+        "albedo": 0.3693027198314667,
+        "roughness": 196.0,
+        "ferric": 1.0169126987457275,
+        "tempRange": 130.10000610351562
+      },
+      "layers_filled": {
+        "elevation": -1329.0,
+        "albedo": 0.37782084941864014,
+        "roughness": 196.0,
+        "ferric": 1.0139412879943848,
+        "tempRange": 130.10000610351562
+      }
+    },
+    {
+      "id": "gap_87.25_-57.91",
+      "name": "Former gap (87.25\u00b0N, -57.91\u00b0E)",
+      "kind": "gap",
+      "lat": 87.24734042553192,
+      "lon": -57.9088471849866,
+      "score_unfilled": 32.72,
+      "score_idw": 29.35,
+      "score_ml": 28.56,
+      "score_filled": 29.35,
+      "delta": -3.37,
+      "delta_idw": -3.37,
+      "delta_ml": -4.16,
+      "delta_ml_minus_idw": -0.79,
+      "layers_unfilled": {
+        "elevation": -2093.0,
+        "albedo": 0.4830351769924164,
+        "roughness": 0.0,
+        "ferric": 0.0,
+        "tempRange": 98.35400390625
+      },
+      "layers_idw": {
+        "elevation": -2093.0,
+        "albedo": 0.4830351769924164,
+        "roughness": 92.95869445800781,
+        "ferric": 0.9902025461196899,
+        "tempRange": 98.35400390625
+      },
+      "layers_ml": {
+        "elevation": -2093.0,
+        "albedo": 0.4830351769924164,
+        "roughness": 112.09610748291016,
+        "ferric": 0.9902336597442627,
+        "tempRange": 98.35400390625
+      },
+      "layers_filled": {
+        "elevation": -2093.0,
+        "albedo": 0.4830351769924164,
+        "roughness": 92.95869445800781,
+        "ferric": 0.9902025461196899,
+        "tempRange": 98.35400390625
+      }
+    },
+    {
+      "id": "gap_87.25_156.68",
+      "name": "Former gap (87.25\u00b0N, 156.68\u00b0E)",
+      "kind": "gap",
+      "lat": 87.24734042553192,
+      "lon": 156.6756032171582,
+      "score_unfilled": 31.52,
+      "score_idw": 30.08,
+      "score_ml": 27.22,
+      "score_filled": 30.08,
+      "delta": -1.44,
+      "delta_idw": -1.44,
+      "delta_ml": -4.3,
+      "delta_ml_minus_idw": -2.86,
+      "layers_unfilled": {
+        "elevation": -2128.0,
+        "albedo": 0.4795083999633789,
+        "roughness": 0.0,
+        "ferric": 0.0,
+        "tempRange": 98.35299682617188
+      },
+      "layers_idw": {
+        "elevation": -2128.0,
+        "albedo": 0.4795083999633789,
+        "roughness": 84.33247375488281,
+        "ferric": 0.9949848651885986,
+        "tempRange": 98.35299682617188
+      },
+      "layers_ml": {
+        "elevation": -2128.0,
+        "albedo": 0.4795083999633789,
+        "roughness": 139.8683624267578,
+        "ferric": 0.9900456070899963,
+        "tempRange": 98.35299682617188
+      },
+      "layers_filled": {
+        "elevation": -2128.0,
+        "albedo": 0.4795083999633789,
+        "roughness": 84.33247375488281,
+        "ferric": 0.9949848651885986,
+        "tempRange": 98.35299682617188
+      }
+    },
+    {
+      "id": "gap_-55.89_171.80",
+      "name": "Former gap (-55.89\u00b0N, 171.80\u00b0E)",
+      "kind": "gap",
+      "lat": -55.8909574468085,
+      "lon": 171.79624664879356,
+      "score_unfilled": 45.66,
+      "score_idw": 35.34,
+      "score_ml": 35.26,
+      "score_filled": 35.34,
+      "delta": -10.32,
+      "delta_idw": -10.32,
+      "delta_ml": -10.4,
+      "delta_ml_minus_idw": -0.08,
+      "layers_unfilled": {
+        "elevation": 660.0,
+        "albedo": 0.2514754831790924,
+        "roughness": 144.0,
+        "ferric": 0.0,
+        "tempRange": 147.97799682617188
+      },
+      "layers_idw": {
+        "elevation": 660.0,
+        "albedo": 0.2514754831790924,
+        "roughness": 144.0,
+        "ferric": 0.9709030389785767,
+        "tempRange": 147.97799682617188
+      },
+      "layers_ml": {
+        "elevation": 660.0,
+        "albedo": 0.2514754831790924,
+        "roughness": 144.0,
+        "ferric": 0.9713758230209351,
+        "tempRange": 147.97799682617188
+      },
+      "layers_filled": {
+        "elevation": 660.0,
+        "albedo": 0.2514754831790924,
+        "roughness": 144.0,
+        "ferric": 0.9709030389785767,
+        "tempRange": 147.97799682617188
+      }
+    },
+    {
+      "id": "gap_-50.86_151.53",
+      "name": "Former gap (-50.86\u00b0N, 151.53\u00b0E)",
+      "kind": "gap",
+      "lat": -50.86436170212767,
+      "lon": 151.52815013404825,
+      "score_unfilled": 64.31,
+      "score_idw": 29.49,
+      "score_ml": 29.7,
+      "score_filled": 29.49,
+      "delta": -34.82,
+      "delta_idw": -34.82,
+      "delta_ml": -34.61,
+      "delta_ml_minus_idw": 0.21,
+      "layers_unfilled": {
+        "elevation": 1688.0,
+        "albedo": 0.0,
+        "roughness": 127.0,
+        "ferric": 0.0,
+        "tempRange": 150.17401123046875
+      },
+      "layers_idw": {
+        "elevation": 1688.0,
+        "albedo": 0.2588358223438263,
+        "roughness": 127.0,
+        "ferric": 0.9841519594192505,
+        "tempRange": 150.17401123046875
+      },
+      "layers_ml": {
+        "elevation": 1688.0,
+        "albedo": 0.2579892873764038,
+        "roughness": 127.0,
+        "ferric": 0.9837772846221924,
+        "tempRange": 150.17401123046875
+      },
+      "layers_filled": {
+        "elevation": 1688.0,
+        "albedo": 0.2588358223438263,
+        "roughness": 127.0,
+        "ferric": 0.9841519594192505,
+        "tempRange": 150.17401123046875
+      }
+    },
+    {
+      "id": "gap_-46.80_107.45",
+      "name": "Former gap (-46.80\u00b0N, 107.45\u00b0E)",
+      "kind": "gap",
+      "lat": -46.795212765957444,
+      "lon": 107.45308310991959,
+      "score_unfilled": 42.34,
+      "score_idw": 48.19,
+      "score_ml": 48.16,
+      "score_filled": 48.19,
+      "delta": 5.85,
+      "delta_idw": 5.85,
+      "delta_ml": 5.82,
+      "delta_ml_minus_idw": -0.03,
+      "layers_unfilled": {
+        "elevation": -6020.0,
+        "albedo": 0.2777297794818878,
+        "roughness": 165.0,
+        "ferric": 0.0,
+        "tempRange": 150.04501342773438
+      },
+      "layers_idw": {
+        "elevation": -6020.0,
+        "albedo": 0.2777297794818878,
+        "roughness": 165.0,
+        "ferric": 0.9873327612876892,
+        "tempRange": 150.04501342773438
+      },
+      "layers_ml": {
+        "elevation": -6020.0,
+        "albedo": 0.2777297794818878,
+        "roughness": 165.0,
+        "ferric": 0.986785888671875,
+        "tempRange": 150.04501342773438
+      },
+      "layers_filled": {
+        "elevation": -6020.0,
+        "albedo": 0.2777297794818878,
+        "roughness": 165.0,
+        "ferric": 0.9873327612876892,
+        "tempRange": 150.04501342773438
+      }
+    },
+    {
+      "id": "gap_-13.76_-126.11",
+      "name": "Former gap (-13.76\u00b0N, -126.11\u00b0E)",
+      "kind": "gap",
+      "lat": -13.76329787234043,
+      "lon": -126.11260053619303,
+      "score_unfilled": 58.64,
+      "score_idw": 44.48,
+      "score_ml": 44.48,
+      "score_filled": 44.48,
+      "delta": -14.16,
+      "delta_idw": -14.16,
+      "delta_ml": -14.16,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": 6850.0,
+        "albedo": 0.0,
+        "roughness": 138.0,
+        "ferric": 0.0,
+        "tempRange": 135.62100219726562
+      },
+      "layers_idw": {
+        "elevation": 6850.0,
+        "albedo": 0.3161450922489166,
+        "roughness": 138.0,
+        "ferric": 1.004271388053894,
+        "tempRange": 135.62100219726562
+      },
+      "layers_ml": {
+        "elevation": 6850.0,
+        "albedo": 0.3159445524215698,
+        "roughness": 138.0,
+        "ferric": 1.004701852798462,
+        "tempRange": 135.62100219726562
+      },
+      "layers_filled": {
+        "elevation": 6850.0,
+        "albedo": 0.3161450922489166,
+        "roughness": 138.0,
+        "ferric": 1.004271388053894,
+        "tempRange": 135.62100219726562
+      }
+    },
+    {
+      "id": "gap_-79.11_-2.90",
+      "name": "Former gap (-79.11\u00b0N, -2.90\u00b0E)",
+      "kind": "gap",
+      "lat": -79.1090425531915,
+      "lon": -2.89544235924933,
+      "score_unfilled": 37.47,
+      "score_idw": 17.6,
+      "score_ml": 17.58,
+      "score_filled": 17.6,
+      "delta": -19.87,
+      "delta_idw": -19.87,
+      "delta_ml": -19.89,
+      "delta_ml_minus_idw": -0.02,
+      "layers_unfilled": {
+        "elevation": 1891.0,
+        "albedo": 0.4713436961174011,
+        "roughness": 139.0,
+        "ferric": 0.0,
+        "tempRange": 118.6099853515625
+      },
+      "layers_idw": {
+        "elevation": 1891.0,
+        "albedo": 0.4713436961174011,
+        "roughness": 139.0,
+        "ferric": 1.004740834236145,
+        "tempRange": 118.53562927246094
+      },
+      "layers_ml": {
+        "elevation": 1891.0,
+        "albedo": 0.4713436961174011,
+        "roughness": 139.0,
+        "ferric": 1.005675196647644,
+        "tempRange": 118.53543090820312
+      },
+      "layers_filled": {
+        "elevation": 1891.0,
+        "albedo": 0.4713436961174011,
+        "roughness": 139.0,
+        "ferric": 1.004740834236145,
+        "tempRange": 118.53562927246094
+      }
+    },
+    {
+      "id": "gap_-82.94_-127.08",
+      "name": "Former gap (-82.94\u00b0N, -127.08\u00b0E)",
+      "kind": "gap",
+      "lat": -82.93882978723406,
+      "lon": -127.07774798927613,
+      "score_unfilled": 34.6,
+      "score_idw": 17.96,
+      "score_ml": 17.75,
+      "score_filled": 17.96,
+      "delta": -16.64,
+      "delta_idw": -16.64,
+      "delta_ml": -16.85,
+      "delta_ml_minus_idw": -0.21,
+      "layers_unfilled": {
+        "elevation": 2717.0,
+        "albedo": 0.6836562752723694,
+        "roughness": 121.0,
+        "ferric": 0.0,
+        "tempRange": 107.60499572753906
+      },
+      "layers_idw": {
+        "elevation": 2717.0,
+        "albedo": 0.6836562752723694,
+        "roughness": 115.93208312988281,
+        "ferric": 0.9994239807128906,
+        "tempRange": 111.1806640625
+      },
+      "layers_ml": {
+        "elevation": 2717.0,
+        "albedo": 0.6836562752723694,
+        "roughness": 118.64266967773438,
+        "ferric": 0.9992424249649048,
+        "tempRange": 110.96278381347656
+      },
+      "layers_filled": {
+        "elevation": 2717.0,
+        "albedo": 0.6836562752723694,
+        "roughness": 115.93208312988281,
+        "ferric": 0.9994239807128906,
+        "tempRange": 111.1806640625
+      }
+    },
+    {
+      "id": "gap_-53.26_87.18",
+      "name": "Former gap (-53.26\u00b0N, 87.18\u00b0E)",
+      "kind": "gap",
+      "lat": -53.25797872340425,
+      "lon": 87.18498659517428,
+      "score_unfilled": 46.86,
+      "score_idw": 47.57,
+      "score_ml": 47.57,
+      "score_filled": 47.57,
+      "delta": 0.71,
+      "delta_idw": 0.71,
+      "delta_ml": 0.71,
+      "delta_ml_minus_idw": 0.0,
+      "layers_unfilled": {
+        "elevation": -2677.0,
+        "albedo": 0.3081285059452057,
+        "roughness": 144.0,
+        "ferric": 0.0,
+        "tempRange": 142.14801025390625
+      },
+      "layers_idw": {
+        "elevation": -2677.0,
+        "albedo": 0.3081285059452057,
+        "roughness": 144.0,
+        "ferric": 0.9917581081390381,
+        "tempRange": 142.14801025390625
+      },
+      "layers_ml": {
+        "elevation": -2677.0,
+        "albedo": 0.3081285059452057,
+        "roughness": 144.0,
+        "ferric": 0.9918591380119324,
+        "tempRange": 142.14801025390625
+      },
+      "layers_filled": {
+        "elevation": -2677.0,
+        "albedo": 0.3081285059452057,
+        "roughness": 144.0,
+        "ferric": 0.9917581081390381,
+        "tempRange": 142.14801025390625
+      }
+    },
+    {
+      "id": "gap_35.55_143.16",
+      "name": "Former gap (35.55\u00b0N, 143.16\u00b0E)",
+      "kind": "gap",
+      "lat": 35.545212765957444,
+      "lon": 143.16353887399464,
+      "score_unfilled": 27.89,
+      "score_idw": 32.86,
+      "score_ml": 32.88,
+      "score_filled": 32.86,
+      "delta": 4.97,
+      "delta_idw": 4.97,
+      "delta_ml": 4.99,
+      "delta_ml_minus_idw": 0.02,
+      "layers_unfilled": {
+        "elevation": -4975.0,
+        "albedo": 0.35580626130104065,
+        "roughness": 158.0,
+        "ferric": 0.0,
+        "tempRange": 128.18600463867188
+      },
+      "layers_idw": {
+        "elevation": -4975.0,
+        "albedo": 0.3547019362449646,
+        "roughness": 158.0,
+        "ferric": 1.0109779834747314,
+        "tempRange": 128.18600463867188
+      },
+      "layers_ml": {
+        "elevation": -4975.0,
+        "albedo": 0.3544309139251709,
+        "roughness": 158.0,
+        "ferric": 1.0113921165466309,
+        "tempRange": 128.18600463867188
+      },
+      "layers_filled": {
+        "elevation": -4975.0,
+        "albedo": 0.3547019362449646,
+        "roughness": 158.0,
+        "ferric": 1.0109779834747314,
+        "tempRange": 128.18600463867188
+      }
+    },
+    {
+      "id": "gap_87.49_158.93",
+      "name": "Former gap (87.49\u00b0N, 158.93\u00b0E)",
+      "kind": "gap",
+      "lat": 87.48670212765957,
+      "lon": 158.92761394101876,
+      "score_unfilled": 31.33,
+      "score_idw": 29.79,
+      "score_ml": 26.95,
+      "score_filled": 29.79,
+      "delta": -1.54,
+      "delta_idw": -1.54,
+      "delta_ml": -4.38,
+      "delta_ml_minus_idw": -2.84,
+      "layers_unfilled": {
+        "elevation": -2133.0,
+        "albedo": 0.4920696020126343,
+        "roughness": 0.0,
+        "ferric": 0.0,
+        "tempRange": 98.76800537109375
+      },
+      "layers_idw": {
+        "elevation": -2133.0,
+        "albedo": 0.4920696020126343,
+        "roughness": 87.2117691040039,
+        "ferric": 0.9929665327072144,
+        "tempRange": 98.76800537109375
+      },
+      "layers_ml": {
+        "elevation": -2133.0,
+        "albedo": 0.4920696020126343,
+        "roughness": 141.17807006835938,
+        "ferric": 0.9902429580688477,
+        "tempRange": 98.76800537109375
+      },
+      "layers_filled": {
+        "elevation": -2133.0,
+        "albedo": 0.4920696020126343,
+        "roughness": 87.2117691040039,
+        "ferric": 0.9929665327072144,
+        "tempRange": 98.76800537109375
+      }
+    },
+    {
+      "id": "gap_-85.09_126.76",
+      "name": "Former gap (-85.09\u00b0N, 126.76\u00b0E)",
+      "kind": "gap",
+      "lat": -85.09308510638297,
+      "lon": 126.75603217158175,
+      "score_unfilled": 44.11,
+      "score_idw": 30.13,
+      "score_ml": 30.19,
+      "score_filled": 30.13,
+      "delta": -13.98,
+      "delta_idw": -13.98,
+      "delta_ml": -13.92,
+      "delta_ml_minus_idw": 0.06,
+      "layers_unfilled": {
+        "elevation": 3781.0,
+        "albedo": 0.2871599793434143,
+        "roughness": 0.0,
+        "ferric": 0.0,
+        "tempRange": 0.0
+      },
+      "layers_idw": {
+        "elevation": 3781.0,
+        "albedo": 0.2871599793434143,
+        "roughness": 128.63893127441406,
+        "ferric": 0.9931933879852295,
+        "tempRange": 115.68236541748047
+      },
+      "layers_ml": {
+        "elevation": 3781.0,
+        "albedo": 0.2871599793434143,
+        "roughness": 121.5108871459961,
+        "ferric": 0.9961904287338257,
+        "tempRange": 108.9255599975586
+      },
+      "layers_filled": {
+        "elevation": 3781.0,
+        "albedo": 0.2871599793434143,
+        "roughness": 128.63893127441406,
+        "ferric": 0.9931933879852295,
+        "tempRange": 115.68236541748047
+      }
+    },
+    {
+      "id": "gap_-88.44_173.08",
+      "name": "Former gap (-88.44\u00b0N, 173.08\u00b0E)",
+      "kind": "gap",
+      "lat": -88.44414893617022,
+      "lon": 173.08310991957103,
+      "score_unfilled": 31.47,
+      "score_idw": 16.35,
+      "score_ml": 16.53,
+      "score_filled": 16.35,
+      "delta": -15.12,
+      "delta_idw": -15.12,
+      "delta_ml": -14.94,
+      "delta_ml_minus_idw": 0.18,
+      "layers_unfilled": {
+        "elevation": 3937.0,
+        "albedo": 0.6379607915878296,
+        "roughness": 0.0,
+        "ferric": 0.0,
+        "tempRange": 0.0
+      },
+      "layers_idw": {
+        "elevation": 3937.0,
+        "albedo": 0.6379607915878296,
+        "roughness": 148.84031677246094,
+        "ferric": 0.9943071007728577,
+        "tempRange": 109.08071899414062
+      },
+      "layers_ml": {
+        "elevation": 3937.0,
+        "albedo": 0.6379607915878296,
+        "roughness": 145.49232482910156,
+        "ferric": 0.998790442943573,
+        "tempRange": 108.0870590209961
+      },
+      "layers_filled": {
+        "elevation": 3937.0,
+        "albedo": 0.6379607915878296,
+        "roughness": 148.84031677246094,
+        "ferric": 0.9943071007728577,
+        "tempRange": 109.08071899414062
+      }
+    },
+    {
+      "id": "gap_-81.74_-63.06",
+      "name": "Former gap (-81.74\u00b0N, -63.06\u00b0E)",
+      "kind": "gap",
+      "lat": -81.74202127659575,
+      "lon": -63.05630026809652,
+      "score_unfilled": 32.94,
+      "score_idw": 16.59,
+      "score_ml": 16.57,
+      "score_filled": 16.59,
+      "delta": -16.35,
+      "delta_idw": -16.35,
+      "delta_ml": -16.37,
+      "delta_ml_minus_idw": -0.02,
+      "layers_unfilled": {
+        "elevation": 3468.0,
+        "albedo": 0.6089485883712769,
+        "roughness": 155.0,
+        "ferric": 0.0,
+        "tempRange": 110.18798828125
+      },
+      "layers_idw": {
+        "elevation": 3468.0,
+        "albedo": 0.6089485883712769,
+        "roughness": 145.3544921875,
+        "ferric": 0.9981357455253601,
+        "tempRange": 110.96207427978516
+      },
+      "layers_ml": {
+        "elevation": 3468.0,
+        "albedo": 0.6089485883712769,
+        "roughness": 145.6917724609375,
+        "ferric": 0.9976504445075989,
+        "tempRange": 110.87349700927734
+      },
+      "layers_filled": {
+        "elevation": 3468.0,
+        "albedo": 0.6089485883712769,
+        "roughness": 145.3544921875,
+        "ferric": 0.9981357455253601,
+        "tempRange": 110.96207427978516
+      }
+    },
+    {
+      "id": "gap_84.14_138.34",
+      "name": "Former gap (84.14\u00b0N, 138.34\u00b0E)",
+      "kind": "gap",
+      "lat": 84.13563829787233,
+      "lon": 138.33780160857907,
+      "score_unfilled": 32.54,
+      "score_idw": 30.12,
+      "score_ml": 28.68,
+      "score_filled": 30.12,
+      "delta": -2.42,
+      "delta_idw": -2.42,
+      "delta_ml": -3.86,
+      "delta_ml_minus_idw": -1.44,
+      "layers_unfilled": {
+        "elevation": -2242.0,
+        "albedo": 0.4756848216056824,
+        "roughness": 0.0,
+        "ferric": 0.0,
+        "tempRange": 99.7239990234375
+      },
+      "layers_idw": {
+        "elevation": -2242.0,
+        "albedo": 0.4756848216056824,
+        "roughness": 82.05038452148438,
+        "ferric": 0.9927690029144287,
+        "tempRange": 99.7239990234375
+      },
+      "layers_ml": {
+        "elevation": -2242.0,
+        "albedo": 0.4756848216056824,
+        "roughness": 118.2394027709961,
+        "ferric": 0.9901912212371826,
+        "tempRange": 99.7239990234375
+      },
+      "layers_filled": {
+        "elevation": -2242.0,
+        "albedo": 0.4756848216056824,
+        "roughness": 82.05038452148438,
+        "ferric": 0.9927690029144287,
+        "tempRange": 99.7239990234375
+      }
+    }
+  ]
+}

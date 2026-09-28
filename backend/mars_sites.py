@@ -15,7 +15,8 @@ class MarsSite:
 
 MARS_FAMOUS_SITES: tuple[MarsSite, ...] = (
     MarsSite("jezero", "Jezero crater (Perseverance)", 18.4447, 77.4508),
-    MarsSite("gale", "Gale crater (Curiosity)", -5.5892, 137.4417),
+    MarsSite("gale", "Gale crater (center)", -5.4, 137.8),
+    MarsSite("curiosity", "Curiosity landing site (Gale)", -5.5892, 137.4417),
     MarsSite("meridiani", "Meridiani Planum (Opportunity)", -1.9462, -5.5266),
     MarsSite("gusev", "Gusev crater (Spirit)", -14.5689, 175.4726),
     MarsSite("viking1", "Viking 1 (Chryse Planitia)", 22.4872, -47.9424),

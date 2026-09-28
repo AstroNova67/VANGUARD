@@ -1,0 +1,88 @@
+{
+  "method": "ml_hist_gradient_boosting",
+  "source": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data_gap_unfilled",
+  "output": "/Users/eshaankhare/gitrepo/VANGUARD/frontend/3d_globe/public/data_gap_ml_filled",
+  "model_dir": "/Users/eshaankhare/gitrepo/VANGUARD/backend/saved_models/gap_imputers",
+  "features": [
+    "lat",
+    "sin_lon",
+    "cos_lon",
+    "slope",
+    "temperature",
+    "crustalThickness",
+    "grsWaterWt",
+    "thermalInertia"
+  ],
+  "params": {
+    "GAUSS_SIGMA": 6.0,
+    "FEATHER_PX": 20.0
+  },
+  "filled_layers": [
+    {
+      "band": "ferric",
+      "filename": "omega_ferric_nnphs.tif",
+      "filled": 122523,
+      "skipped_no_covariates": 243,
+      "remaining_zeros": 0,
+      "pct": 14.589,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 1.08
+    },
+    {
+      "band": "albedo",
+      "filename": "omega_albedo_r1080.tif",
+      "filled": 11796,
+      "skipped_no_covariates": 0,
+      "remaining_zeros": 0,
+      "pct": 1.402,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.26
+    },
+    {
+      "band": "roughness",
+      "filename": "mola_roughness_0.6km_numeric.tif",
+      "filled": 43626,
+      "skipped_no_covariates": 0,
+      "remaining_zeros": 0,
+      "pct": 5.184,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.24
+    },
+    {
+      "band": "tempRange",
+      "filename": "mars_yearly_temperature_range_v1.0.tif",
+      "filled": 26932,
+      "skipped_no_covariates": 0,
+      "remaining_zeros": 0,
+      "pct": 3.201,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.17
+    },
+    {
+      "band": "elevation",
+      "filename": "MOLA_128ppd_topo.tif",
+      "filled": 51,
+      "skipped_no_covariates": 0,
+      "remaining_zeros": 0,
+      "pct": 0.006,
+      "shape": [
+        752,
+        1119
+      ],
+      "seconds": 0.3
+    }
+  ],
+  "note": "Copied data_gap_unfilled/, then ML-imputed the five gap bands (ferric, albedo, roughness, tempRange, elevation) with HGBR + gaussian feather."
+}

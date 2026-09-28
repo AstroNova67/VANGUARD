@@ -58,7 +58,7 @@ function syncPredictLandingButtonWithBackend() {
   if (!btn || btn.style.display === "none") return;
   btn.disabled = !vanguardBackendModelsReady || !marsRastersReady;
   if (!marsRastersReady) {
-    btn.title = "Load rasters at this point first (Load rasters here).";
+    btn.title = "Click Mars (or Enter in lat/lon) to load rasters first.";
   } else if (!vanguardBackendModelsReady) {
     btn.title = "Wait until the ML backend is ready (see status above).";
   } else {
@@ -156,8 +156,21 @@ sunMesh.position.set(sunDistance, 0, 0);
 sunPivot.add(sunMesh);
 
 // --- UI Controls ---
-document.getElementById("toggleSun")?.addEventListener("click", () => {
-  sunRotationEnabled = !sunRotationEnabled;
+function syncSunOrbitToggleUi() {
+  const input = document.getElementById("toggleSun");
+  const stateEl = document.getElementById("sunOrbitState");
+  if (input && input.type === "checkbox") {
+    input.checked = sunRotationEnabled;
+  }
+  if (stateEl) {
+    stateEl.textContent = sunRotationEnabled ? "Orbiting" : "Paused";
+    stateEl.classList.toggle("is-paused", !sunRotationEnabled);
+  }
+}
+
+document.getElementById("toggleSun")?.addEventListener("change", (e) => {
+  sunRotationEnabled = Boolean(e.target.checked);
+  syncSunOrbitToggleUi();
 });
 
 document.getElementById("sunAngle")?.addEventListener("input", (e) => {
@@ -165,7 +178,10 @@ document.getElementById("sunAngle")?.addEventListener("input", (e) => {
   sunMesh.position.set(Math.cos(angle) * sunDistance, 0, Math.sin(angle) * sunDistance);
   sunLight.position.copy(sunMesh.position);
   sunRotationEnabled = false;
+  syncSunOrbitToggleUi();
 });
+
+syncSunOrbitToggleUi();
 
 function formatPred(n, decimals = 2) {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return "—";
@@ -513,6 +529,103 @@ function buildPredictRequestBody(marsData) {
   };
 }
 
+/**
+ * POST /predict and return parsed JSON (throws on network / non-JSON / HTTP errors).
+ * @param {string} apiUrl
+ * @param {Record<string, unknown>} marsData
+ */
+async function postLandingPredict(apiUrl, marsData) {
+  let body;
+  try {
+    body = JSON.stringify(buildPredictRequestBody(marsData));
+  } catch (err) {
+    throw new Error(`Could not serialize predict payload: ${err?.message || err}`);
+  }
+
+  let response;
+  try {
+    response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  } catch (err) {
+    const detail = err?.message || String(err);
+    throw new Error(
+      `Network error talking to ${apiUrl} (${detail}). Keep the Flask server running and open the globe from that same origin (e.g. http://127.0.0.1:5002).`
+    );
+  }
+
+  if (response.status === 503) {
+    let msg =
+      "ML models are still loading on the server (503). Wait for the green status under Score, then try again.";
+    try {
+      const j = await response.json();
+      if (j?.error) msg = `${msg} (${j.error})`;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    const text = await response.text();
+    throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
+  }
+
+  return response.json();
+}
+
+function formatLiveScoreDelta(a, b) {
+  if (typeof a !== "number" || typeof b !== "number") return null;
+  const delta = b - a;
+  const text = `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
+  const cls =
+    delta > 0.005 ? "gap-fill-delta-pos" : delta < -0.005 ? "gap-fill-delta-neg" : "gap-fill-delta-zero";
+  return { delta, text, cls };
+}
+
+function buildGapFillScoreCompareHtml(idwScore, unfilledScore, mlScore) {
+  const hasA = typeof unfilledScore === "number";
+  const hasB = typeof idwScore === "number";
+  const hasC = typeof mlScore === "number";
+  if (!hasA && !hasB && !hasC) {
+    return `<p class="pred-gap-compare pred-gap-compare--missing" role="status">Gap-fill score comparison unavailable for this point.</p>`;
+  }
+  const deltaBA = hasA && hasB ? formatLiveScoreDelta(unfilledScore, idwScore) : null;
+  const deltaCA = hasA && hasC ? formatLiveScoreDelta(unfilledScore, mlScore) : null;
+  const deltaCB = hasB && hasC ? formatLiveScoreDelta(idwScore, mlScore) : null;
+  const row = (label, value, extraClass = "") =>
+    typeof value === "number"
+      ? `<div class="pred-gap-compare__row ${extraClass}">
+        <span class="pred-gap-compare__label">${label}</span>
+        <span class="pred-gap-compare__value">${Number(value).toFixed(2)}%</span>
+      </div>`
+      : "";
+  const deltaRow = (label, cmp) =>
+    cmp
+      ? `<div class="pred-gap-compare__row pred-gap-compare__row--delta">
+        <span class="pred-gap-compare__label">${label}</span>
+        <span class="pred-gap-compare__value ${cmp.cls}">${cmp.text}</span>
+      </div>`
+      : "";
+  return `
+    <div class="pred-gap-compare" role="group" aria-label="Three-arm gap-fill score comparison">
+      ${row("A · No corrections", unfilledScore)}
+      ${row("B · Manual fill (IDW, globe)", idwScore)}
+      ${row("C · ML fill", mlScore)}
+      ${deltaRow("Δ(B−A) IDW vs none", deltaBA)}
+      ${deltaRow("Δ(C−A) ML vs none", deltaCA)}
+      ${deltaRow("Δ(C−B) ML vs IDW", deltaCB)}
+    </div>`;
+}
+
 function getScoringWeightsForAgent() {
   return readScoringWeightsPercentFromInputs();
 }
@@ -566,13 +679,13 @@ async function predictLandingSuitability() {
   }
   if (!marsRastersReady) {
     document.getElementById("landingScore").innerHTML =
-      '<div class="pred-panel pred-panel--error" role="alert">Load rasters at this point first (Load rasters here), then run prediction.</div>';
+      '<div class="pred-panel pred-panel--error" role="alert">Click a point on Mars first so rasters can load, then run prediction.</div>';
     return;
   }
   
   try {
     document.getElementById("landingScore").innerHTML =
-      '<div class="pred-panel pred-panel--loading"><span class="pred-loading-spinner" aria-hidden="true"></span><span>Running prediction…</span></div>';
+      '<div class="pred-panel pred-panel--loading"><span class="pred-loading-spinner" aria-hidden="true"></span><span>Running prediction (A / B / C)…</span></div>';
     document.getElementById("predictLanding").disabled = true;
     
     const base = getVanguardApiBase();
@@ -583,43 +696,37 @@ async function predictLandingSuitability() {
     }
 
     const apiUrl = `${base}/predict`;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(buildPredictRequestBody(currentMarsData)),
-    });
-    
-    if (response.status === 503) {
-      let msg =
-        "ML models are still loading on the server (503). Wait for the green status under Landing prediction, then try again.";
+    // Sequential predicts — avoids dual-request races that surface as vague "Load failed".
+    // B = IDW (currentMarsData / globe), A = unfilled, C = ML fill.
+    const result = await postLandingPredict(apiUrl, currentMarsData);
+    let unfilledResult = null;
+    if (currentMarsDataUnfilled != null) {
       try {
-        const j = await response.json();
-        if (j?.error) msg = `${msg} (${j.error})`;
-      } catch {
-        /* ignore */
+        unfilledResult = await postLandingPredict(apiUrl, currentMarsDataUnfilled);
+      } catch (err) {
+        console.warn("Unfilled predict failed:", err);
       }
-      throw new Error(msg);
     }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+    let mlResult = null;
+    if (currentMarsDataMl != null) {
+      try {
+        mlResult = await postLandingPredict(apiUrl, currentMarsDataMl);
+      } catch (err) {
+        console.warn("ML-filled predict failed:", err);
+      }
     }
-    
-    // Check content type
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
-    }
-    
-    const result = await response.json();
     
     if (result.success) {
       lastLandingScorePercent =
         typeof result.landing_score === "number" ? result.landing_score : null;
+      lastLandingScoreUnfilledPercent =
+        unfilledResult?.success && typeof unfilledResult.landing_score === "number"
+          ? unfilledResult.landing_score
+          : null;
+      lastLandingScoreMlPercent =
+        mlResult?.success && typeof mlResult.landing_score === "number"
+          ? mlResult.landing_score
+          : null;
       const score = result.landing_score;
       let scoreBand = "high";
       let scoreText = "Good";
@@ -632,6 +739,12 @@ async function predictLandingSuitability() {
       } else if (score >= 70) {
         scoreText = "Excellent";
       }
+
+      const gapCompareHtml = buildGapFillScoreCompareHtml(
+        lastLandingScorePercent,
+        lastLandingScoreUnfilledPercent,
+        lastLandingScoreMlPercent
+      );
       
       const { fused, nnBaseline, nnOnly, reg, dataSources, overrides } = unpackPredictPayload(result);
       if (nnBaseline == null) {
@@ -705,6 +818,7 @@ async function predictLandingSuitability() {
         <div class="pred-panel pred-panel--score-${scoreBand}">
           <div class="pred-score-card">
             <div class="pred-score">Landing suitability: ${score}% <span class="pred-score-note">(${scoreText})</span></div>
+            ${gapCompareHtml}
             <p class="pred-lead">Each row shows observed rasters, <strong>Neural</strong> (Keras), and <strong>XGB</strong> (temp &amp; TI). The landing % uses the ML columns only: <strong>Neural · in score</strong> or <strong>XGB · in score</strong> marks which value was used (slope, dust, and water always from Keras here). <strong>Δ</strong> = |model − raster| for comparison.</p>
           </div>
           ${baselineWarn}
@@ -770,13 +884,21 @@ async function predictLandingSuitability() {
           </div>
         </div>
       `;
+      updateScoreFloat(
+        lastLandingScorePercent,
+        lastLandingScoreUnfilledPercent,
+        lastLandingScoreMlPercent
+      );
+      requestAnimationFrame(() => scrollLandingScoreIntoView());
     } else {
       document.getElementById("landingScore").innerHTML = `<div class="pred-panel pred-panel--error">${result.error || "Request failed"}</div>`;
+      clearScoreFloat();
     }
     
   } catch (error) {
     console.error("API call failed:", error);
     document.getElementById("landingScore").innerHTML = `<div class="pred-panel pred-panel--error">Could not reach API: ${error.message}</div>`;
+    clearScoreFloat();
   } finally {
     document.getElementById("predictLanding").disabled = false;
   }
@@ -800,13 +922,36 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// --- Marker Setup ---
-const marker = new THREE.Mesh(
-  new THREE.SphereGeometry(0.05, 16, 16),
-  new THREE.MeshBasicMaterial({ color: "red" })
+// --- Marker Setup (small pin + ring for precise surface targeting) ---
+const MARS_RADIUS = 2;
+const marker = new THREE.Group();
+const markerCore = new THREE.Mesh(
+  new THREE.SphereGeometry(0.014, 20, 20),
+  new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: true })
 );
+const markerHalo = new THREE.Mesh(
+  new THREE.RingGeometry(0.022, 0.034, 48),
+  new THREE.MeshBasicMaterial({
+    color: 0xffb4a8,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.92,
+    depthTest: true,
+  })
+);
+marker.add(markerCore);
+marker.add(markerHalo);
 marker.visible = false;
 scene.add(marker);
+
+/** Place the selection pin just above the surface, ring facing outward. */
+function placeSelectionMarker(lat, lon, markerPoint) {
+  const pt = markerPoint ?? marsSurfacePointFromLatLon(lat, lon);
+  const n = pt.clone().normalize();
+  marker.position.copy(n.multiplyScalar(MARS_RADIUS * 1.008));
+  marker.lookAt(0, 0, 0);
+  marker.visible = true;
+}
 
 // --- Raycasting ---
 const raycaster = new THREE.Raycaster();
@@ -816,56 +961,56 @@ const mouse = new THREE.Vector2();
 const marsDatasets = {
   elevation: {
     name: "Elevation (MOLA)",
-    file: "./public/data/MOLA_128ppd_topo.tif",
+    file: "./public/data_gap_filled/MOLA_128ppd_topo.tif",
     unit: "m",
     description: "Mars Orbiter Laser Altimeter elevation data",
     marsDataKey: "elevation",
   },
   slope: {
     name: "Slope",
-    file: "./public/data/mola_hrsc_blend_slope_v2.tif",
+    file: "./public/data_gap_filled/mola_hrsc_blend_slope_v2.tif",
     unit: "°",
     description: "Surface slope measurements",
     marsDataKey: "slope",
   },
   roughness: {
     name: "Roughness",
-    file: "./public/data/mola_roughness_0.6km_numeric.tif",
+    file: "./public/data_gap_filled/mola_roughness_0.6km_numeric.tif",
     unit: "m",
     description: "Surface roughness at 0.6km scale",
     marsDataKey: "roughness",
   },
   albedo: {
     name: "Albedo",
-    file: "./public/data/omega_albedo_r1080.tif",
+    file: "./public/data_gap_filled/omega_albedo_r1080.tif",
     unit: "",
     description: "Surface albedo (reflectivity)",
     marsDataKey: "albedo",
   },
   temperature: {
     name: "Temperature",
-    file: "./public/data/mars_yearly_avg_temperature_celsius.tif",
+    file: "./public/data_gap_filled/mars_yearly_avg_temperature_celsius.tif",
     unit: "°C",
     description: "Yearly average surface temperature",
     marsDataKey: "temperature",
   },
   tempRange: {
     name: "Temperature Range",
-    file: "./public/data/mars_yearly_temperature_range_v1.0.tif",
+    file: "./public/data_gap_filled/mars_yearly_temperature_range_v1.0.tif",
     unit: "°C",
     description: "Yearly temperature variation",
     marsDataKey: "tempRange",
   },
   crustalThickness: {
     name: "Crustal Thickness",
-    file: "./public/data/mars_crustal_thickness_gmm3_rm1.tif",
+    file: "./public/data_gap_filled/mars_crustal_thickness_gmm3_rm1.tif",
     unit: "km",
     description: "Mars crustal thickness",
     marsDataKey: "crustalThickness",
   },
   ferric: {
     name: "Ferric / dust (OMEGA)",
-    file: "./public/data/omega_ferric_nnphs.tif",
+    file: "./public/data_gap_filled/omega_ferric_nnphs.tif",
     unit: "",
     description:
       "OMEGA ferric/dust-related index (same raster is copied to dustObserved for the Observed column)",
@@ -873,40 +1018,49 @@ const marsDatasets = {
   },
   pyroxene: {
     name: "Pyroxene",
-    file: "./public/data/omega_pyroxene_bd2000.tif",
+    file: "./public/data_gap_filled/omega_pyroxene_bd2000.tif",
     unit: "",
     description: "Pyroxene mineral content",
     marsDataKey: "pyroxene",
   },
   basalt: {
     name: "Basalt",
-    file: "./public/data/TES_Basalt_numeric.tif",
+    file: "./public/data_gap_filled/TES_Basalt_numeric.tif",
     unit: "",
     description: "Basalt abundance",
     marsDataKey: "basalt",
   },
   lambertAlbedo: {
     name: "Lambert Albedo",
-    file: "./public/data/TES_Lambert_Albedo_numeric.tif",
+    file: "./public/data_gap_filled/TES_Lambert_Albedo_numeric.tif",
     unit: "",
     description: "Lambert albedo from TES",
     marsDataKey: "lambertAlbedo",
   },
   thermalInertiaObs: {
     name: "Thermal inertia (TES dayside, Putzig 2007)",
-    file: "./public/data/tes_dayside_ti_putzig_2007.tif",
+    file: "./public/data_gap_filled/tes_dayside_ti_putzig_2007.tif",
     unit: "TIU",
     description: "TES dayside thermal inertia (Putzig et al. 2007); SI-style inertia units",
     marsDataKey: "thermalInertia",
   },
   grsWaterWt: {
     name: "GRS water equivalent (% wt)",
-    file: "./public/data/mars_odyssey_grs_mons_perc_wt.tif",
+    file: "./public/data_gap_filled/mars_odyssey_grs_mons_perc_wt.tif",
     unit: "%",
     description: "Mars Odyssey GRS hydrogen / water-equivalent weight percent (MONS product)",
     marsDataKey: "grsWaterWt",
   },
 };
+
+/** Dataset keys that were IDW gap-filled (compare vs data_gap_unfilled/). */
+const GAP_FILLED_DATASET_TYPES = [
+  "elevation",
+  "roughness",
+  "albedo",
+  "tempRange",
+  "ferric",
+];
 
 /**
  * Approximate coordinates (°N latitude, °E longitude, −180…180) for quick landing tests.
@@ -914,7 +1068,8 @@ const marsDatasets = {
  */
 const MARS_FAMOUS_LOCATIONS = [
   { id: "jezero", name: "Jezero crater (Perseverance)", lat: 18.4447, lon: 77.4508 },
-  { id: "gale", name: "Gale crater (Curiosity)", lat: -5.5892, lon: 137.4417 },
+  { id: "gale", name: "Gale crater (center)", lat: -5.4, lon: 137.8 },
+  { id: "curiosity", name: "Curiosity landing site (Gale)", lat: -5.5892, lon: 137.4417 },
   { id: "meridiani", name: "Meridiani Planum (Opportunity)", lat: -1.9462, lon: -5.5266 },
   { id: "gusev", name: "Gusev crater (Spirit)", lat: -14.5689, lon: 175.4726 },
   { id: "viking1", name: "Viking 1 (Chryse Planitia)", lat: 22.4872, lon: -47.9424 },
@@ -932,13 +1087,31 @@ const MARS_FAMOUS_LOCATIONS = [
 let currentDataset = null;
 let currentDatasetType = null;
 let loadedDatasets = new Map();
+/** Cache for pre-fill GeoTIFFs (gap layers only). */
+let loadedUnfilledDatasets = new Map();
+/** Cache for ML-filled GeoTIFFs (gap layers only). */
+let loadedMlFilledDatasets = new Map();
 /** In-flight GeoTIFF fetches keyed by `marsDatasets` id (dedupe parallel requests). */
 const loadingDatasetPromises = new Map();
-/** True after all layers were sampled at the current lat/lon via “Load rasters here”. */
+const loadingUnfilledDatasetPromises = new Map();
+const loadingMlFilledDatasetPromises = new Map();
+/** True after all layers were sampled at the current lat/lon (auto on click / jump). */
 let marsRastersReady = false;
-let currentMarsData = null; // Store current Mars data for API calls
+let currentMarsData = null; // Store current Mars data for API calls (gap-filled layers)
+/** Parallel payload using pre-fill rasters for gap layers (same lat/lon). */
+let currentMarsDataUnfilled = null;
+/** Parallel payload using ML-filled gap layers (Arm C). */
+let currentMarsDataMl = null;
 /** @type {number | null} */
 let lastLandingScorePercent = null;
+/** @type {number | null} */
+let lastLandingScoreUnfilledPercent = null;
+/** @type {number | null} */
+let lastLandingScoreMlPercent = null;
+/** Highest journey step unlocked (1–3). */
+let journeyUnlocked = 1;
+/** Current visible journey step. */
+let journeyStep = 1;
 
 /** Cached blended globe textures per `marsDatasets` key (not including suitability). */
 const globeLayerTextureCache = new Map();
@@ -1049,6 +1222,76 @@ async function loadDataset(datasetType) {
     });
   loadingDatasetPromises.set(datasetType, pending);
   return pending;
+}
+
+function unfilledFileForDataset(datasetType) {
+  const file = marsDatasets[datasetType]?.file;
+  if (!file) return null;
+  return file.replace("/data_gap_filled/", "/data_gap_unfilled/");
+}
+
+function mlFilledFileForDataset(datasetType) {
+  const file = marsDatasets[datasetType]?.file;
+  if (!file) return null;
+  return file.replace("/data_gap_filled/", "/data_gap_ml_filled/");
+}
+
+async function loadUnfilledDataset(datasetType) {
+  if (!GAP_FILLED_DATASET_TYPES.includes(datasetType)) return null;
+  if (loadedUnfilledDatasets.has(datasetType)) {
+    return loadedUnfilledDatasets.get(datasetType);
+  }
+  if (loadingUnfilledDatasetPromises.has(datasetType)) {
+    return loadingUnfilledDatasetPromises.get(datasetType);
+  }
+  const path = unfilledFileForDataset(datasetType);
+  if (!path) return null;
+  const pending = loadGeoTIFF(path, { allowFallback: false })
+    .then((data) => {
+      loadedUnfilledDatasets.set(datasetType, data);
+      loadingUnfilledDatasetPromises.delete(datasetType);
+      return data;
+    })
+    .catch((err) => {
+      loadingUnfilledDatasetPromises.delete(datasetType);
+      throw err;
+    });
+  loadingUnfilledDatasetPromises.set(datasetType, pending);
+  return pending;
+}
+
+async function loadMlFilledDataset(datasetType) {
+  if (!GAP_FILLED_DATASET_TYPES.includes(datasetType)) return null;
+  if (loadedMlFilledDatasets.has(datasetType)) {
+    return loadedMlFilledDatasets.get(datasetType);
+  }
+  if (loadingMlFilledDatasetPromises.has(datasetType)) {
+    return loadingMlFilledDatasetPromises.get(datasetType);
+  }
+  const path = mlFilledFileForDataset(datasetType);
+  if (!path) return null;
+  const pending = loadGeoTIFF(path, { allowFallback: false })
+    .then((data) => {
+      loadedMlFilledDatasets.set(datasetType, data);
+      loadingMlFilledDatasetPromises.delete(datasetType);
+      return data;
+    })
+    .catch((err) => {
+      loadingMlFilledDatasetPromises.delete(datasetType);
+      throw err;
+    });
+  loadingMlFilledDatasetPromises.set(datasetType, pending);
+  return pending;
+}
+
+function getValueFromUnfilledDataset(datasetType, lat, lon) {
+  const dataset = loadedUnfilledDatasets.get(datasetType);
+  return sampleDatasetAt(dataset, lat, lon);
+}
+
+function getValueFromMlFilledDataset(datasetType, lat, lon) {
+  const dataset = loadedMlFilledDatasets.get(datasetType);
+  return sampleDatasetAt(dataset, lat, lon);
 }
 
 const GLOBE_SURFACE_OPTIONS = [
@@ -1208,7 +1451,7 @@ function isNoDataSample(raw, nodata) {
 }
 
 /** Path to ML suitability GeoTIFF (query string for cache bust is added in {@link landingMlOverlayRequestUrl}). */
-const LANDING_ML_OVERLAY_PATH = "./public/data/mars_landing_suitability_ml.tif";
+const LANDING_ML_OVERLAY_PATH = "./public/data_gap_filled/mars_landing_suitability_ml.tif";
 const LANDING_ML_OVERLAY_NODATA_FALLBACK = -9999;
 /**
  * Bump when overlay colors change, the TIFF is regenerated, or you need browsers to refetch/rebuild the overlay.
@@ -1884,7 +2127,7 @@ document.getElementById("landingMlOverlayToggle")?.addEventListener("change", as
     void applyGlobeSurfaceLayerSelect();
     setLandingOverlayLegend(false);
     setStatus(
-      "Could not load mars_landing_suitability_ml.tif — check frontend/3d_globe/public/data/ and the browser console."
+      "Could not load mars_landing_suitability_ml.tif — check frontend/3d_globe/public/data_gap_filled/ and the browser console."
     );
   } finally {
     landingMlOverlayLoading = false;
@@ -1969,24 +2212,154 @@ function buildPlaceholderMarsData(lat, lon) {
   return out;
 }
 
-function formatCoordsPlaceholderList(lat, lon) {
-  let lines = `Lat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°\n\n`;
-  for (const meta of Object.values(marsDatasets)) {
-    const unit = meta.unit ? ` ${meta.unit}` : "";
-    lines += `• ${meta.name}: ${RASTER_VALUE_PLACEHOLDER}${unit}\n`;
+function escapeHtmlText(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function setJourneyStep(_step, _opts) {
+  // Journey tabs removed — single scrolling panel.
+}
+
+function updatePlaceSelectionUi(lat, lon, { rastersReady = false } = {}) {
+  const guide = document.getElementById("placeEmptyGuide");
+  const summary = document.getElementById("placeSelectionSummary");
+  const coordsEl = document.getElementById("placeSelectionCoords");
+  const hint = document.getElementById("placeSelectionHint");
+  if (guide) guide.hidden = true;
+  if (summary) summary.hidden = false;
+  if (coordsEl) {
+    coordsEl.textContent = `${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E`;
   }
-  lines += `\nClick “Load rasters here” to fetch GeoTIFF samples at this point.`;
-  return lines;
+  if (hint) {
+    hint.textContent = rastersReady
+      ? "Layers ready — drape a map or run Score below."
+      : "Sampling GeoTIFF layers…";
+  }
+}
+
+function clearPlaceSelectionUi() {
+  const guide = document.getElementById("placeEmptyGuide");
+  const summary = document.getElementById("placeSelectionSummary");
+  if (guide) guide.hidden = false;
+  if (summary) summary.hidden = true;
+}
+
+function renderCoordsLoading(lat, lon) {
+  const coordsEl = document.getElementById("coords");
+  if (!coordsEl) return;
+  coordsEl.classList.remove("coords--empty");
+  coordsEl.classList.add("coords--loading");
+  coordsEl.innerHTML = `<p class="coords-placeholder">Loading GeoTIFF layers…<br/>Lat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°</p>`;
+}
+
+/**
+ * @param {{ lat: number, lon: number, rows: { name: string, valueStr: string, changed?: boolean }[], gapNote?: string | null }} opts
+ */
+function renderCoordsGrid({ lat, lon, rows, gapNote = null }) {
+  const coordsEl = document.getElementById("coords");
+  if (!coordsEl) return;
+  coordsEl.classList.remove("coords--empty", "coords--loading");
+  const rowsHtml = rows
+    .map((r) => {
+      const cls = r.changed ? "coords-grid__row coords-grid__row--changed" : "coords-grid__row";
+      return `<div class="${cls}"><span class="coords-grid__name">${escapeHtmlText(r.name)}</span><span class="coords-grid__value">${escapeHtmlText(r.valueStr)}</span></div>`;
+    })
+    .join("");
+  const noteHtml = gapNote
+    ? `<p class="coords-gap-note">${escapeHtmlText(gapNote)}</p>`
+    : "";
+  coordsEl.innerHTML = `<div class="coords-grid-wrap">
+    <div class="coords-grid-meta">${lat.toFixed(2)}°N · ${lon.toFixed(2)}°E</div>
+    <div class="coords-grid">${rowsHtml}</div>
+    ${noteHtml}
+  </div>`;
+}
+
+function renderCoordsPlaceholderGrid(lat, lon) {
+  const rows = Object.values(marsDatasets).map((meta) => ({
+    name: meta.name,
+    valueStr: meta.unit ? `${RASTER_VALUE_PLACEHOLDER} ${meta.unit}` : RASTER_VALUE_PLACEHOLDER,
+    changed: false,
+  }));
+  renderCoordsGrid({
+    lat,
+    lon,
+    rows,
+    gapNote: "Waiting for GeoTIFF samples…",
+  });
+}
+
+function clearScoreFloat() {
+  const el = document.getElementById("scoreFloat");
+  if (!el) return;
+  el.hidden = true;
+  el.innerHTML = "";
+}
+
+function updateScoreFloat(idwScore, unfilledScore, mlScore) {
+  const el = document.getElementById("scoreFloat");
+  if (!el || typeof idwScore !== "number") {
+    clearScoreFloat();
+    return;
+  }
+  const cmpBA =
+    typeof unfilledScore === "number" ? formatLiveScoreDelta(unfilledScore, idwScore) : null;
+  const cmpCA = typeof mlScore === "number" && typeof unfilledScore === "number"
+    ? formatLiveScoreDelta(unfilledScore, mlScore)
+    : null;
+  const parts = [];
+  if (cmpBA) parts.push(`<span class="score-float__delta ${cmpBA.cls}">IDW ${cmpBA.text}</span>`);
+  if (cmpCA) parts.push(`<span class="score-float__delta ${cmpCA.cls}">ML ${cmpCA.text}</span>`);
+  el.innerHTML = `
+    <span class="score-float__label">Score (IDW)</span>
+    <span class="score-float__value">${Number(idwScore).toFixed(1)}%</span>
+    ${parts.join(" ")}
+  `;
+  el.hidden = false;
+}
+
+function scrollLandingScoreIntoView() {
+  const el = document.getElementById("landingScore");
+  el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function initJourneyUi() {
+  document.getElementById("demoHellasBtn")?.addEventListener("click", () => {
+    void runHellasGapFillDemo();
+  });
+  document.getElementById("scoreFloat")?.addEventListener("click", () => {
+    scrollLandingScoreIntoView();
+  });
+}
+
+async function runHellasGapFillDemo() {
+  const hellas = MARS_FAMOUS_LOCATIONS.find((l) => l.id === "hellas");
+  if (!hellas) return;
+  frameCameraOnMarsLatLon(hellas.lat, hellas.lon);
+  await loadMarsReadingsAtLatLon(hellas.lat, hellas.lon, null);
+  const predBtn = document.getElementById("predictLanding");
+  if (predBtn && !predBtn.disabled && predBtn.style.display !== "none") {
+    await predictLandingSuitability();
+  }
 }
 
 /** Pick a point on Mars — marker + placeholder readings; no GeoTIFF download. */
 function setMarsLocation(lat, lon, markerPoint) {
   marsRastersReady = false;
   currentMarsData = buildPlaceholderMarsData(lat, lon);
+  currentMarsDataUnfilled = null;
+  currentMarsDataMl = null;
+  lastLandingScoreUnfilledPercent = null;
+  lastLandingScoreMlPercent = null;
+  lastLandingScorePercent = null;
+  clearScoreFloat();
 
-  const coordsEl = document.getElementById("coords");
-  coordsEl.classList.remove("coords--empty");
-  coordsEl.innerText = formatCoordsPlaceholderList(lat, lon);
+  updatePlaceSelectionUi(lat, lon, { rastersReady: false });
+  renderCoordsPlaceholderGrid(lat, lon);
 
   const predBtn = document.getElementById("predictLanding");
   if (predBtn) predBtn.style.display = "block";
@@ -1995,9 +2368,7 @@ function setMarsLocation(lat, lon, markerPoint) {
   if (hint) hint.style.display = "block";
   document.getElementById("landingScore").innerText = "";
 
-  const pt = markerPoint ?? marsSurfacePointFromLatLon(lat, lon);
-  marker.position.copy(pt);
-  marker.visible = true;
+  placeSelectionMarker(lat, lon, markerPoint);
 
   const manualLatEl = document.getElementById("manualLat");
   const manualLonEl = document.getElementById("manualLon");
@@ -2007,19 +2378,22 @@ function setMarsLocation(lat, lon, markerPoint) {
 
 /** Download all GeoTIFF layers and sample them at (lat, lon). */
 async function loadMarsReadingsAtLatLon(lat, lon, markerPoint) {
-  const coordsEl = document.getElementById("coords");
-  coordsEl.classList.remove("coords--empty");
-  coordsEl.innerText = `Loading GeoTIFF layers…\nLat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°`;
+  clearScoreFloat();
+  lastLandingScorePercent = null;
+  lastLandingScoreUnfilledPercent = null;
+  lastLandingScoreMlPercent = null;
+  updatePlaceSelectionUi(lat, lon, { rastersReady: false });
+  renderCoordsLoading(lat, lon);
 
   const loadBtn = document.getElementById("applyManualLatLon");
   if (loadBtn) loadBtn.disabled = true;
 
   marsRastersReady = false;
   currentMarsData = buildPlaceholderMarsData(lat, lon);
+  currentMarsDataUnfilled = null;
+  currentMarsDataMl = null;
 
-  const pt = markerPoint ?? marsSurfacePointFromLatLon(lat, lon);
-  marker.position.copy(pt);
-  marker.visible = true;
+  placeSelectionMarker(lat, lon, markerPoint);
 
   const manualLatEl = document.getElementById("manualLat");
   const manualLonEl = document.getElementById("manualLon");
@@ -2027,20 +2401,35 @@ async function loadMarsReadingsAtLatLon(lat, lon, markerPoint) {
   if (manualLonEl) manualLonEl.value = lon.toFixed(4);
 
   const datasetTypes = Object.keys(marsDatasets);
-  await Promise.all(
-    datasetTypes.map(async (datasetType) => {
+  await Promise.all([
+    ...datasetTypes.map(async (datasetType) => {
       try {
         await loadDataset(datasetType);
       } catch (error) {
         console.warn(`Failed to load ${marsDatasets[datasetType]?.name ?? datasetType}:`, error);
       }
-    })
-  );
+    }),
+    ...GAP_FILLED_DATASET_TYPES.map(async (datasetType) => {
+      try {
+        await loadUnfilledDataset(datasetType);
+      } catch (error) {
+        console.warn(`Failed to load unfilled ${datasetType}:`, error);
+      }
+    }),
+    ...GAP_FILLED_DATASET_TYPES.map(async (datasetType) => {
+      try {
+        await loadMlFilledDataset(datasetType);
+      } catch (error) {
+        console.warn(`Failed to load ML-filled ${datasetType}:`, error);
+      }
+    }),
+  ]);
 
   const allValues = datasetTypes.map((datasetType) => {
     const datasetInfo = marsDatasets[datasetType];
     const value = getValueFromDataset(datasetType, lat, lon);
     return {
+      datasetType,
       name: datasetInfo.name,
       value,
       unit: datasetInfo.unit,
@@ -2048,21 +2437,61 @@ async function loadMarsReadingsAtLatLon(lat, lon, markerPoint) {
     };
   });
 
-  let valuesList = `Lat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°\n\n`;
   for (const item of allValues) {
-    const valueStr =
-      item.value !== null && item.value !== undefined && !Number.isNaN(Number(item.value))
-        ? `${Number(item.value).toFixed(2)} ${item.unit}`
-        : "N/A";
-    valuesList += `• ${item.name}: ${valueStr}\n`;
     if (item.marsDataKey) {
       currentMarsData[item.marsDataKey] = item.value;
     }
   }
   currentMarsData.dustObserved = currentMarsData.ferric;
-  marsRastersReady = true;
 
-  coordsEl.innerText = valuesList;
+  currentMarsDataUnfilled = { ...currentMarsData };
+  currentMarsDataMl = { ...currentMarsData };
+  const changedKeys = new Set();
+  let gapChangeCount = 0;
+  for (const datasetType of GAP_FILLED_DATASET_TYPES) {
+    const meta = marsDatasets[datasetType];
+    if (!meta?.marsDataKey) continue;
+    const uv = getValueFromUnfilledDataset(datasetType, lat, lon);
+    if (uv !== null && uv !== undefined && !Number.isNaN(Number(uv))) {
+      currentMarsDataUnfilled[meta.marsDataKey] = uv;
+      const fv = currentMarsData[meta.marsDataKey];
+      if (fv != null && Number(fv) !== Number(uv)) {
+        changedKeys.add(datasetType);
+        gapChangeCount += 1;
+      }
+    }
+    const mv = getValueFromMlFilledDataset(datasetType, lat, lon);
+    if (mv !== null && mv !== undefined && !Number.isNaN(Number(mv))) {
+      currentMarsDataMl[meta.marsDataKey] = mv;
+    }
+  }
+  currentMarsDataUnfilled.dustObserved = currentMarsDataUnfilled.ferric;
+  currentMarsDataMl.dustObserved = currentMarsDataMl.ferric;
+
+  const rows = allValues.map((item) => {
+    const valueStr =
+      item.value !== null && item.value !== undefined && !Number.isNaN(Number(item.value))
+        ? `${Number(item.value).toFixed(2)}${item.unit ? ` ${item.unit}` : ""}`
+        : "N/A";
+    return {
+      name: item.name,
+      valueStr,
+      changed: changedKeys.has(item.datasetType),
+    };
+  });
+
+  renderCoordsGrid({
+    lat,
+    lon,
+    rows,
+    gapNote:
+      gapChangeCount > 0
+        ? `${gapChangeCount} gap layer${gapChangeCount === 1 ? "" : "s"} differ from unfilled at this point (highlighted).`
+        : null,
+  });
+
+  marsRastersReady = true;
+  updatePlaceSelectionUi(lat, lon, { rastersReady: true });
 
   const predBtn = document.getElementById("predictLanding");
   if (predBtn) predBtn.style.display = "block";
@@ -2072,6 +2501,9 @@ async function loadMarsReadingsAtLatLon(lat, lon, markerPoint) {
   document.getElementById("landingScore").innerText = "";
 
   if (loadBtn) loadBtn.disabled = false;
+
+  const predSection = document.getElementById("predictLanding");
+  predSection?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 async function onApplyManualLatLon() {
@@ -2108,7 +2540,7 @@ function initFamousMarsSitesSelect() {
     const fb = document.getElementById("manualCoordsFeedback");
     if (fb) fb.textContent = "";
     frameCameraOnMarsLatLon(lat, lon);
-    setMarsLocation(lat, lon, null);
+    await loadMarsReadingsAtLatLon(lat, lon, null);
     sel.value = "";
   });
 }
@@ -2128,13 +2560,14 @@ async function onMouseClick(event) {
     const lat = Math.asin(point.y / radius) * (180 / Math.PI);
     const fb = document.getElementById("manualCoordsFeedback");
     if (fb) fb.textContent = "";
-    setMarsLocation(lat, lon, point);
+    await loadMarsReadingsAtLatLon(lat, lon, point);
   }
 }
 
 window.addEventListener("click", onMouseClick, false);
 
 initFamousMarsSitesSelect();
+initJourneyUi();
 
 document.getElementById("applyManualLatLon")?.addEventListener("click", () => {
   void onApplyManualLatLon();
@@ -2160,6 +2593,18 @@ function getAgentCoordinateContext() {
       lat: Number(currentMarsData.lat),
       lon: Number(currentMarsData.lon),
       landingScore: lastLandingScorePercent,
+      landingScoreUnfilled: lastLandingScoreUnfilledPercent,
+      landingScoreMl: lastLandingScoreMlPercent,
+      gapFillDelta:
+        typeof lastLandingScorePercent === "number" &&
+        typeof lastLandingScoreUnfilledPercent === "number"
+          ? Number((lastLandingScorePercent - lastLandingScoreUnfilledPercent).toFixed(2))
+          : null,
+      gapFillDeltaMl:
+        typeof lastLandingScoreMlPercent === "number" &&
+        typeof lastLandingScoreUnfilledPercent === "number"
+          ? Number((lastLandingScoreMlPercent - lastLandingScoreUnfilledPercent).toFixed(2))
+          : null,
     };
   }
   const latStr = document.getElementById("manualLat")?.value ?? "";
@@ -2170,6 +2615,18 @@ function getAgentCoordinateContext() {
       lat: parsed.lat,
       lon: parsed.lon,
       landingScore: lastLandingScorePercent,
+      landingScoreUnfilled: lastLandingScoreUnfilledPercent,
+      landingScoreMl: lastLandingScoreMlPercent,
+      gapFillDelta:
+        typeof lastLandingScorePercent === "number" &&
+        typeof lastLandingScoreUnfilledPercent === "number"
+          ? Number((lastLandingScorePercent - lastLandingScoreUnfilledPercent).toFixed(2))
+          : null,
+      gapFillDeltaMl:
+        typeof lastLandingScoreMlPercent === "number" &&
+        typeof lastLandingScoreUnfilledPercent === "number"
+          ? Number((lastLandingScoreMlPercent - lastLandingScoreUnfilledPercent).toFixed(2))
+          : null,
     };
   }
   return null;
@@ -2191,11 +2648,7 @@ async function executeAgentUiActions(actions) {
       const fb = document.getElementById("manualCoordsFeedback");
       if (fb) fb.textContent = "";
       frameCameraOnMarsLatLon(lat, lon, { tight: Boolean(a.tightCamera) });
-      if (a.runPrediction) {
-        await loadMarsReadingsAtLatLon(lat, lon, null);
-      } else {
-        setMarsLocation(lat, lon, null);
-      }
+      await loadMarsReadingsAtLatLon(lat, lon, null);
       const siteSel = document.getElementById("famousMarsSite");
       if (siteSel && a.siteId) {
         const opt = [...siteSel.options].find((o) => o.value === a.siteId);

@@ -38,9 +38,26 @@ backend/*.bak
 
 # Multi-GB rasters (rebuild locally; not suitable for git)
 frontend/3d_globe/public/data/mars_global_input_stack_32ppd.tif
+frontend/3d_globe/public/data/mars_global_input_stack_32ppd_nullfixed.tif
+frontend/3d_globe/public/data/mars_global_input_stack_32ppd_nullfixed_v2.tif
 frontend/3d_globe/public/data/mars_landing_suitability_ml.tif
 frontend/3d_globe/public/data/mars_landing_suitability_ml copy.tif
+frontend/3d_globe/public/data/mars_landing_suitability_ml_pre_nullfill.tif
+frontend/3d_globe/public/data_gap_filled/mars_landing_suitability_ml.tif
+frontend/3d_globe/public/data_gap_unfilled/mars_landing_suitability_ml.tif
+frontend/3d_globe/public/data_gap_ml_filled/mars_landing_suitability_ml.tif
 scripts/resolution_study/stacks/
 scripts/resolution_study/outputs/
+
+# Scratch / intermediate gap-fill artifacts (regenerate via notebooks or scripts)
+backend/cropped_filled.tif
+backend/omega_ferric_nnphs.tif
+backend/notebooks/**/*_filled_crop.tif
+scripts/nullfill_*.json
+scripts/null_zero_audit_report.json
+scripts/suitability_nullfill_compare.json
+
+# Local JMARS / API config with credentials — do not commit
+frontend/3d_globe/public/mars_layers.json
 
 .env

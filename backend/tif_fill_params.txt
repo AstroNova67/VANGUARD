@@ -1,0 +1,38 @@
+VANGUARD Mars Geoscience null scan + fill notebooks
+Updated: 2026-09-25
+Source scanned: /Users/eshaankhare/Downloads/Mars Geoscience/
+Null rule: value == 0 OR non-finite OR GDAL nodata tag
+Machine-readable: backend/tif_null_scan.json
+
+All layers in this export are 1119 x 752 px (ungeoreferenced / no CRS tag).
+
+======================================================================
+SCAN SUMMARY
+======================================================================
+
+HAS exact zeros:
+  omega_pyroxene_bd2000.tif                      52.58%  (442,481 px)  [CAUTION: may be true zero abundance]
+  TES_Basalt_numeric.tif                         38.32%  (322,435 px)  [CAUTION: may be true zero abundance]
+  omega_ferric_nnphs.tif                         14.59%  (122,766 px)  [likely instrument gaps — fill OK]
+  mola_roughness_0.6km_numeric.tif                5.18%  (43,626 px)
+  mars_yearly_temperature_range_v1.0.tif          3.20%  (26,932 px)
+  omega_albedo_r1080.tif                          1.40%  (11,796 px)  [likely instrument gaps — fill OK]
+  mola_hrsc_blend_topo_v2.tif                     0.01%  (51 px)
+
+NO exact zeros (nothing to fill):
+  mars_crustal_thickness_gmm3_rm1.tif
+  mars_odyssey_grs_mons_perc_wt.tif
+  mars_yearly_avg_temperature_celsius.tif
+  mola_hrsc_blend_slope_v2.tif
+
+Non-finite pixels: 0 across all scanned layers. nodata tags: none.
+
+======================================================================
+NOTEBOOK FOLDERS
+======================================================================
+  backend/notebooks/gap_fills/       — historically gap layers (ferric, albedo, topo, slope)
+  backend/notebooks/no_missing_data/ — others (incl. basalt/pyroxene mineral zeros)
+
+Note: on this Mars Geoscience export, slope is clean (0% zeros); topo has only 0.01%.
+Ferric (~14.6%) and albedo (~1.4%) remain the clearest fill targets.
+Basalt (~38%) / pyroxene (~53%) zeros are likely real abundance, not gaps.
