@@ -1,17 +1,21 @@
 import * as THREE from "three";
+import { GLTFLoader } from "jsm/loaders/GLTFLoader.js";
 
 /**
  * Real Mars-system features for the globe scene.
  *
- * Moons: orbital distances track Mars radii (Phobos ~2.76 Rm, Deimos ~6.9 Rm).
- * Physical sizes are exaggerated ~15× so they read in a demo — true mean radii
- * are ~11 km / ~6 km vs Mars ~3390 km (invisible at 1:1 on this globe).
+ * Moons: NASA/JPL VTAD glTF shapes + textures (Phobos / Deimos), orbital distances
+ * track Mars radii (Phobos ~2.76 Rm, Deimos ~6.9 Rm). Physical sizes are exaggerated
+ * ~15× so they read in a demo — true mean radii are ~11 km / ~6 km vs Mars ~3390 km.
  *
- * Occasional meteors for sky life. No atmosphere wash / zodiacal fog overlays.
+ * Occasional meteors, distant Earth point, moon sun catch-light.
  */
 
 const MARS_RADIUS_KM = 3389.5;
 const MARS_MESH_RADIUS = 2;
+
+const PHOBOS_MODEL_URL = "./models/phobos.glb";
+const DEIMOS_MODEL_URL = "./models/deimos.glb";
 
 function kmToScene(km) {
   return (km / MARS_RADIUS_KM) * MARS_MESH_RADIUS;
@@ -40,7 +44,6 @@ function makeRockTexture(seed = 1) {
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Stickney-scale crater hint on Phobos (seed 1).
   if (seed === 1) {
     ctx.fillStyle = "rgba(20,16,12,0.55)";
     ctx.beginPath();
@@ -57,7 +60,7 @@ function makeRockTexture(seed = 1) {
   return tex;
 }
 
-/** Irregular potato mesh — Phobos/Deimos are not spheres. */
+/** Fallback potato mesh if NASA glTF fails to load. */
 function makePotatoGeometry(radius, { squash = 1, stretch = 1.2, crater = false } = {}) {
   const geo = new THREE.IcosahedronGeometry(radius, 3);
   const pos = geo.attributes.position;
@@ -74,7 +77,6 @@ function makePotatoGeometry(radius, { squash = 1, stretch = 1.2, crater = false 
     v.y *= squash;
     v.z *= 0.9;
     if (crater) {
-      // Flatten a Stickney-like face toward +X.
       const toward = Math.max(0, n.x);
       v.x -= toward * radius * 0.22;
     }
@@ -84,36 +86,93 @@ function makePotatoGeometry(radius, { squash = 1, stretch = 1.2, crater = false 
   return geo;
 }
 
-function makeMoonMesh(name, { radius, color, seed, crater }) {
+function makeFallbackMoonMesh(name, { radius, color, seed, crater }) {
   const mat = new THREE.MeshStandardMaterial({
     map: makeRockTexture(seed),
     color,
-    roughness: 0.92,
-    metalness: 0.02,
+    roughness: 0.72,
+    metalness: 0.12,
     flatShading: true,
+    emissive: new THREE.Color(0xffe0c0),
+    emissiveIntensity: 0.04,
   });
   const mesh = new THREE.Mesh(
     makePotatoGeometry(radius, {
-      stretch: name === "Phobos" ? 1.25 : 1.15,
-      squash: name === "Phobos" ? 0.88 : 0.92,
+      stretch: name.startsWith("Phobos") ? 1.25 : 1.15,
+      squash: name.startsWith("Phobos") ? 0.88 : 0.92,
       crater,
     }),
     mat
   );
   mesh.name = name;
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
   return mesh;
 }
 
+/** Tune NASA materials for sunlight + optional catch-light emissive. */
+function prepareMoonMaterials(root) {
+  root.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const m of mats) {
+      if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+      if ("roughness" in m) m.roughness = Math.min(0.92, m.roughness ?? 0.85);
+      if ("metalness" in m) m.metalness = Math.min(0.08, m.metalness ?? 0.04);
+      if ("emissive" in m) {
+        m.emissive = new THREE.Color(0xffe0c0);
+        m.emissiveIntensity = 0.03;
+      }
+      m.needsUpdate = true;
+    }
+  });
+}
+
+/**
+ * Scale + center a loaded glTF so its longest axis matches targetRadius * 2.
+ * @returns {THREE.Group}
+ */
+function fitMoonModel(gltfScene, targetRadius) {
+  const wrapper = new THREE.Group();
+  const model = gltfScene;
+  wrapper.add(model);
+
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  const center = new THREE.Vector3();
+  const size = new THREE.Vector3();
+  box.getCenter(center);
+  box.getSize(size);
+  model.position.sub(center);
+
+  const maxDim = Math.max(size.x, size.y, size.z, 1e-6);
+  wrapper.scale.setScalar((targetRadius * 2) / maxDim);
+
+  prepareMoonMaterials(wrapper);
+  return wrapper;
+}
+
+function forEachMoonMaterial(root, fn) {
+  root.traverse((obj) => {
+    if (!obj.isMesh || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const m of mats) fn(m);
+  });
+}
+
+const _moonLitDir = new THREE.Vector3();
+
 /**
  * @param {THREE.Scene} scene
- * @returns {{ update: (dt: number) => void, phobos: THREE.Object3D, deimos: THREE.Object3D }}
+ * @returns {{
+ *   update: (dt: number, sunWorldDir?: THREE.Vector3) => void,
+ *   phobos: THREE.Object3D,
+ *   deimos: THREE.Object3D,
+ *   getSettings: () => object,
+ *   setSettings: (partial: object) => object
+ * }}
  */
 export function addMarsMoons(scene) {
   const SIZE_EXAGGERATION = 15;
 
-  // Semi-major axes (km) → scene units from Mars center.
   const phobosOrbitR = kmToScene(9376);
   const deimosOrbitR = kmToScene(23460);
   const phobosRadius = kmToScene(11.08) * SIZE_EXAGGERATION;
@@ -124,14 +183,18 @@ export function addMarsMoons(scene) {
   phobosPivot.rotation.x = THREE.MathUtils.degToRad(1.1);
   scene.add(phobosPivot);
 
-  const phobos = makeMoonMesh("Phobos", {
+  const phobos = new THREE.Object3D();
+  phobos.name = "Phobos";
+  phobos.position.set(phobosOrbitR, 0, 0);
+  phobosPivot.add(phobos);
+
+  const phobosFallback = makeFallbackMoonMesh("PhobosFallback", {
     radius: phobosRadius,
     color: 0xb8a090,
     seed: 1,
     crater: true,
   });
-  phobos.position.set(phobosOrbitR, 0, 0);
-  phobosPivot.add(phobos);
+  phobos.add(phobosFallback);
 
   const deimosPivot = new THREE.Object3D();
   deimosPivot.name = "deimosOrbit";
@@ -139,37 +202,167 @@ export function addMarsMoons(scene) {
   deimosPivot.rotation.z = THREE.MathUtils.degToRad(8);
   scene.add(deimosPivot);
 
-  const deimos = makeMoonMesh("Deimos", {
+  const deimos = new THREE.Object3D();
+  deimos.name = "Deimos";
+  deimos.position.set(deimosOrbitR, 0, 0);
+  deimosPivot.add(deimos);
+
+  const deimosFallback = makeFallbackMoonMesh("DeimosFallback", {
     radius: deimosRadius,
     color: 0xc4b4a4,
     seed: 2,
     crater: false,
   });
-  deimos.position.set(deimosOrbitR, 0, 0);
-  deimosPivot.add(deimos);
+  deimos.add(deimosFallback);
 
-  // Periods: Phobos 0.3189 d, Deimos 1.2625 d → ω_P / ω_D ≈ 3.96
-  const deimosOmega = 0.08; // rad / second (demo-paced, not real-time)
+  const loader = new GLTFLoader();
+
+  function loadMoonModel(url, anchor, fallback, targetRadius, label) {
+    loader.load(
+      url,
+      (gltf) => {
+        const fitted = fitMoonModel(gltf.scene, targetRadius);
+        fitted.name = `${label}Model`;
+        if (fallback.parent) fallback.parent.remove(fallback);
+        fallback.geometry?.dispose?.();
+        if (fallback.material) {
+          fallback.material.map?.dispose?.();
+          fallback.material.dispose?.();
+        }
+        anchor.add(fitted);
+      },
+      undefined,
+      (err) => {
+        console.warn(`[moons] Failed to load ${label} model; keeping procedural mesh.`, err);
+      }
+    );
+  }
+
+  loadMoonModel(PHOBOS_MODEL_URL, phobos, phobosFallback, phobosRadius, "Phobos");
+  loadMoonModel(DEIMOS_MODEL_URL, deimos, deimosFallback, deimosRadius, "Deimos");
+
+  const deimosOmega = 0.08;
   const phobosOmega = deimosOmega * (1.2625 / 0.3189);
-
   const marsCenter = new THREE.Vector3(0, 0, 0);
+  const moonWorld = new THREE.Vector3();
+  const toSun = new THREE.Vector3();
+
+  const settings = {
+    moonCatchLight: true,
+  };
+
+  function applyCatchLight(moon, sunWorldDir) {
+    if (!settings.moonCatchLight || !sunWorldDir) {
+      forEachMoonMaterial(moon, (m) => {
+        if ("emissiveIntensity" in m) m.emissiveIntensity = 0.02;
+        if ("roughness" in m) m.roughness = 0.9;
+        if ("metalness" in m) m.metalness = 0.02;
+      });
+      return;
+    }
+    moon.getWorldPosition(moonWorld);
+    toSun.copy(sunWorldDir).normalize();
+    _moonLitDir.copy(moonWorld).normalize();
+    const lit = Math.max(0, _moonLitDir.dot(toSun));
+    forEachMoonMaterial(moon, (m) => {
+      if ("emissiveIntensity" in m) m.emissiveIntensity = 0.03 + lit * 0.16;
+      if ("roughness" in m) m.roughness = 0.78;
+      if ("metalness" in m) m.metalness = 0.06;
+    });
+  }
+
+  function applySettings(partial = {}) {
+    Object.assign(settings, partial);
+    return { ...settings };
+  }
 
   return {
     phobos,
     deimos,
-    update(dt) {
+    getSettings: () => ({ ...settings }),
+    setSettings: applySettings,
+    update(dt, sunWorldDir) {
       phobosPivot.rotation.y += phobosOmega * dt;
       deimosPivot.rotation.y += deimosOmega * dt;
-      // Tidally locked: same face toward Mars.
       phobos.lookAt(marsCenter);
       deimos.lookAt(marsCenter);
+      applyCatchLight(phobos, sunWorldDir);
+      applyCatchLight(deimos, sunWorldDir);
+    },
+  };
+}
+
+function makeEarthPointTexture() {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, size, size);
+  const cx = size / 2;
+  const cy = size / 2;
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, size / 2);
+  g.addColorStop(0, "rgba(230,245,255,1)");
+  g.addColorStop(0.25, "rgba(120,180,255,0.85)");
+  g.addColorStop(0.55, "rgba(70,140,255,0.35)");
+  g.addColorStop(1, "rgba(40,100,220,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * Distant Earth as a tiny blue-white point near the sunward ecliptic (from Mars).
+ * @param {THREE.Object3D} sunPivot
+ */
+export function addEarthFromMars(sunPivot) {
+  const group = new THREE.Group();
+  group.name = "earthFromMars";
+
+  const mat = new THREE.SpriteMaterial({
+    map: makeEarthPointTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    opacity: 0.95,
+    toneMapped: false,
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.name = "earthPoint";
+  const dist = 52;
+  const sep = 0.42;
+  sprite.position.set(Math.cos(sep) * dist, 0.08, Math.sin(sep) * dist);
+  sprite.scale.set(0.55, 0.55, 1);
+  group.add(sprite);
+  sunPivot.add(group);
+
+  const settings = { earth: true };
+
+  function applySettings(partial = {}) {
+    Object.assign(settings, partial);
+    group.visible = settings.earth;
+    return { ...settings };
+  }
+
+  applySettings({});
+
+  return {
+    group,
+    getSettings: () => ({ ...settings }),
+    setSettings: applySettings,
+    update(tSec) {
+      if (!settings.earth) return;
+      mat.opacity = 0.75 + 0.2 * Math.sin(tSec * 2.1);
+      const s = 0.5 + 0.08 * Math.sin(tSec * 1.7 + 1.2);
+      sprite.scale.set(s, s, 1);
     },
   };
 }
 
 /**
- * Occasional faint meteors across the celestial sphere.
- * @returns {{ update: (dt: number) => void }}
+ * Occasional meteors — mostly faint; rare brighter fireballs.
  */
 export function addMeteorShowers(scene) {
   const group = new THREE.Group();
@@ -177,7 +370,7 @@ export function addMeteorShowers(scene) {
   scene.add(group);
 
   const pool = [];
-  const POOL = 5;
+  const POOL = 6;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute(
     "position",
@@ -205,10 +398,18 @@ export function addMeteorShowers(scene) {
       dir: new THREE.Vector3(),
       origin: new THREE.Vector3(),
       length: 1,
+      peakOpacity: 0.35,
+      bright: false,
     });
   }
 
-  let cooldown = 1.5 + Math.random() * 3;
+  const settings = {
+    meteors: true,
+    meteorRate: "rare",
+  };
+
+  let cooldown = 4 + Math.random() * 6;
+  let brightCooldown = 25 + Math.random() * 40;
   const xAxis = new THREE.Vector3(1, 0, 0);
   const radial = new THREE.Vector3();
   const tangential = new THREE.Vector3();
@@ -226,7 +427,7 @@ export function addMeteorShowers(scene) {
     );
   }
 
-  function spawn(m) {
+  function spawn(m, bright) {
     const r = 30 + Math.random() * 14;
     const start = spherePointOnRadius(r);
     tangential
@@ -239,23 +440,62 @@ export function addMeteorShowers(scene) {
     }
     m.origin.copy(start);
     m.dir.copy(tangential);
-    m.length = 1.4 + Math.random() * 2.8;
+    m.bright = bright;
+    m.length = bright ? 3.2 + Math.random() * 2.5 : 0.9 + Math.random() * 1.6;
     m.life = 0;
-    m.maxLife = 0.5 + Math.random() * 0.6;
-    m.speed = 20 + Math.random() * 24;
+    m.maxLife = bright ? 0.7 + Math.random() * 0.45 : 0.35 + Math.random() * 0.4;
+    m.speed = bright ? 28 + Math.random() * 18 : 16 + Math.random() * 16;
+    m.peakOpacity = bright ? 0.95 : 0.22 + Math.random() * 0.18;
     m.line.visible = true;
-    m.line.material.color.setHSL(0.08 + Math.random() * 0.08, 0.4, 0.88);
+    if (bright) {
+      m.line.material.color.setHSL(0.08 + Math.random() * 0.06, 0.55, 0.92);
+    } else {
+      m.line.material.color.setHSL(0.1 + Math.random() * 0.08, 0.25, 0.8);
+    }
     m.line.material.opacity = 0;
   }
 
+  function nextFaintCooldown() {
+    if (settings.meteorRate === "demo") return 1.8 + Math.random() * 3.5;
+    return 6 + Math.random() * 10;
+  }
+
+  function nextBrightCooldown() {
+    if (settings.meteorRate === "demo") return 12 + Math.random() * 18;
+    return 35 + Math.random() * 50;
+  }
+
+  function applySettings(partial = {}) {
+    Object.assign(settings, partial);
+    group.visible = settings.meteors;
+    return { ...settings };
+  }
+
   return {
+    getSettings: () => ({ ...settings }),
+    setSettings: applySettings,
     update(dt) {
-      cooldown -= dt;
-      if (cooldown <= 0) {
-        const idle = pool.find((m) => !m.line.visible);
-        if (idle) spawn(idle);
-        cooldown = 2.2 + Math.random() * 5;
+      if (!settings.meteors) {
+        for (const m of pool) {
+          m.line.visible = false;
+          m.line.material.opacity = 0;
+        }
+        return;
       }
+
+      cooldown -= dt;
+      brightCooldown -= dt;
+
+      if (brightCooldown <= 0) {
+        const idle = pool.find((m) => !m.line.visible);
+        if (idle) spawn(idle, true);
+        brightCooldown = nextBrightCooldown();
+      } else if (cooldown <= 0) {
+        const idle = pool.find((m) => !m.line.visible);
+        if (idle) spawn(idle, false);
+        cooldown = nextFaintCooldown();
+      }
+
       for (const m of pool) {
         if (!m.line.visible) continue;
         m.life += dt;
@@ -265,8 +505,8 @@ export function addMeteorShowers(scene) {
           m.line.material.opacity = 0;
           continue;
         }
-        const fade = t < 0.2 ? t / 0.2 : t > 0.65 ? (1 - t) / 0.35 : 1;
-        m.line.material.opacity = 0.65 * fade;
+        const fade = t < 0.15 ? t / 0.15 : t > 0.6 ? (1 - t) / 0.4 : 1;
+        m.line.material.opacity = m.peakOpacity * fade;
         tmp.copy(m.origin).addScaledVector(m.dir, m.speed * m.life);
         m.line.position.copy(tmp);
         m.line.quaternion.setFromUnitVectors(xAxis, m.dir);

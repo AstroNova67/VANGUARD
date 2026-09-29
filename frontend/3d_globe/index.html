@@ -72,11 +72,13 @@
         max-height: none;
         overflow-y: auto;
         overflow-x: auto;
-        background: rgba(10, 10, 12, 0.9);
+        background: rgba(10, 10, 12, 0.58);
+        backdrop-filter: saturate(180%) blur(22px);
+        -webkit-backdrop-filter: saturate(180%) blur(22px);
         padding: 16px;
         border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
         scrollbar-width: thin;
         scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
       }
@@ -564,10 +566,27 @@
       }
 
       .globe-surface-card {
-        margin-top: 10px;
+        margin-top: 0;
+        display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 8px;
+        gap: 6px;
+        padding: 10px 12px !important;
+      }
+
+      .globe-surface-card .overlay-toggle-hint {
+        margin: 0;
+        min-height: 0;
+      }
+
+      .globe-surface-card .overlay-toggle-hint:empty {
+        display: none;
+      }
+
+      .globe-surface-card .landing-overlay-legend:not(.is-visible) {
+        display: none !important;
+        margin: 0;
+        padding: 0;
       }
 
       .globe-surface-label {
@@ -576,6 +595,7 @@
         letter-spacing: 0.06em;
         text-transform: uppercase;
         color: #6a9aba;
+        margin: 0;
       }
 
       .globe-surface-select {
@@ -599,19 +619,31 @@
         margin-top: 8px;
       }
 
-      .manual-coords {
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      .place-selection {
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.28);
+        margin-bottom: 0;
       }
 
-      .manual-coords-title {
-        margin: 0 0 8px;
+      .place-selection .manual-coords-row {
+        margin-bottom: 8px;
+      }
+
+      .place-selection__hint {
+        margin: 0;
         font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: #6a9aba;
+        color: #9bb0c0;
+        line-height: 1.45;
+      }
+
+      .place-selection__demo {
+        margin-top: 10px;
+      }
+
+      .place-selection__demo[hidden] {
+        display: none !important;
       }
 
       .manual-coords-row {
@@ -619,7 +651,6 @@
         flex-wrap: wrap;
         gap: 10px 14px;
         align-items: flex-end;
-        margin-bottom: 10px;
       }
 
       .manual-coords-field {
@@ -647,19 +678,12 @@
         border-radius: 8px;
       }
 
-      .manual-coords-actions {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 10px;
-      }
-
       .manual-coords-feedback {
-        margin: 8px 0 0;
+        margin: 6px 0 0;
         font-size: 11px;
         line-height: 1.4;
         color: #e8a090;
-        min-height: 1.2em;
+        min-height: 0;
       }
 
       .manual-coords-feedback:empty {
@@ -667,7 +691,7 @@
       }
 
       #coords {
-        margin-top: 0;
+        margin-top: 12px;
         font-size: 12.5px;
         line-height: 1.5;
         white-space: pre-line;
@@ -1931,24 +1955,7 @@
 
       <section class="panel-section" aria-label="Pick a place">
         <div class="panel-section-title">Place</div>
-        <div id="placeEmptyGuide" class="coords-empty-guide">
-          <p class="coords-empty-guide__lead">Click the globe, jump to a famous site, or try a gap-fill demo (Hellas +Δ, or Gap-fill demo sites in the list).</p>
-          <button type="button" class="btn-secondary" id="demoHellasBtn">
-            Demo: Hellas (score rises after fill)
-          </button>
-        </div>
-        <div id="placeSelectionSummary" class="place-selection" hidden>
-          <div class="place-selection__coords" id="placeSelectionCoords"></div>
-          <p class="place-selection__hint" id="placeSelectionHint">Sampling GeoTIFF layers…</p>
-        </div>
-        <div class="famous-sites-block" aria-label="Famous Mars locations">
-          <label class="globe-surface-label" for="famousMarsSite">Famous locations</label>
-          <select id="famousMarsSite" class="globe-surface-select" aria-label="Famous Mars location presets">
-            <option value="">— Select a landing or science site —</option>
-          </select>
-        </div>
-        <div class="manual-coords" aria-label="Manual coordinates">
-          <p class="manual-coords-title">Or enter coordinates</p>
+        <div id="placeSelectionSummary" class="place-selection">
           <div class="manual-coords-row">
             <div class="manual-coords-field">
               <label for="manualLat">Latitude (°)</label>
@@ -1973,9 +1980,21 @@
               />
             </div>
           </div>
-          <!-- Load rasters here button removed — auto-load on click / site / Enter -->
-          <p class="overlay-toggle-hint">Rasters load automatically. Press Enter after typing coords.</p>
+          <p class="place-selection__hint" id="placeSelectionHint">
+            Click Mars, pick a famous site, or type coords and press Enter.
+          </p>
           <p class="manual-coords-feedback" id="manualCoordsFeedback" role="status"></p>
+          <div id="placeEmptyGuide" class="place-selection__demo">
+            <button type="button" class="btn-secondary" id="demoHellasBtn">
+              Demo: Hellas (score rises after fill)
+            </button>
+          </div>
+        </div>
+        <div class="famous-sites-block" aria-label="Famous Mars locations">
+          <label class="globe-surface-label" for="famousMarsSite">Famous locations</label>
+          <select id="famousMarsSite" class="globe-surface-select" aria-label="Famous Mars location presets">
+            <option value="">— Select a landing or science site —</option>
+          </select>
         </div>
       </section>
 
@@ -2051,8 +2070,65 @@
                 <input id="sunAngle" type="range" min="0" max="360" value="0" aria-label="Sun angle" />
               </div>
               <p class="overlay-toggle-hint">
-                Phobos &amp; Deimos orbit at real distances; moon sizes are exaggerated ~15× so you can see them. Distant sky smudges are deep-sky objects — not near Mars.
+                Sun angle rotates the whole sun system (Sun, Earth, daylight). The starfield stays fixed — as it should for a distant sky.
               </p>
+              <p class="overlay-toggle-hint">
+                Phobos &amp; Deimos use NASA/JPL VTAD glTF models (real shape + texture); sizes exaggerated ~15× for visibility. Orbital distances are to scale.
+              </p>
+              <p class="overlay-toggle-hint">
+                Milky Way panorama: ESO/S. Brunier
+                (<a href="https://www.eso.org/public/images/eso0932a/" target="_blank" rel="noopener noreferrer">eso0932a</a>, CC&nbsp;BY&nbsp;4.0).
+              </p>
+            </div>
+          </section>
+          <section class="panel-section" id="spaceSkySettings" aria-label="Space sky settings">
+            <div class="panel-section-title">Space sky</div>
+            <div class="control-card sky-settings-card">
+              <div class="sky-settings-row">
+                <label for="skyExposureMode">Exposure</label>
+                <select id="skyExposureMode" class="sky-settings-select" aria-label="Sky exposure mode">
+                  <option value="eye" selected>Naked eye</option>
+                  <option value="cinematic">Cinematic (camera)</option>
+                </select>
+              </div>
+              <label class="overlay-toggle" for="skyMwBreathe">
+                <input type="checkbox" id="skyMwBreathe" checked />
+                <span>Milky Way breathe (±5% / 30s)</span>
+              </label>
+              <label class="overlay-toggle" for="skyGlitter">
+                <input type="checkbox" id="skyGlitter" checked />
+                <span>Star glitter</span>
+              </label>
+              <label class="overlay-toggle" for="skyDeepSky">
+                <input type="checkbox" id="skyDeepSky" checked />
+                <span>Deep-sky smudges (Andromeda, LMC, SMC)</span>
+              </label>
+              <label class="overlay-toggle" for="skyEarth">
+                <input type="checkbox" id="skyEarth" checked />
+                <span>Earth (pale blue point near Sun)</span>
+              </label>
+              <label class="overlay-toggle" for="skyMeteors">
+                <input type="checkbox" id="skyMeteors" checked />
+                <span>Meteors</span>
+              </label>
+              <div class="sky-settings-row" id="skyMeteorRateRow">
+                <label for="skyMeteorRate">Meteor rate</label>
+                <select id="skyMeteorRate" class="sky-settings-select" aria-label="Meteor frequency">
+                  <option value="rare" selected>Rare (1–2 bright / min)</option>
+                  <option value="demo">Demo (more frequent)</option>
+                </select>
+              </div>
+              <label class="overlay-toggle" for="skyMoonCatchLight">
+                <input type="checkbox" id="skyMoonCatchLight" checked />
+                <span>Moon sun catch-light</span>
+              </label>
+              <label class="overlay-toggle" for="skySunGlare">
+                <input type="checkbox" id="skySunGlare" checked />
+                <span>Sun glare when looking at the Sun</span>
+              </label>
+              <div class="sky-settings-actions">
+                <button type="button" class="btn-secondary" id="skySettingsReset">Reset sky defaults</button>
+              </div>
             </div>
           </section>
           <section class="panel-section" aria-label="Global batch map overlay">
@@ -2127,7 +2203,7 @@
     <!-- Load GeoTIFF as global -->
     <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     <!-- Your Three.js script -->
-    <link rel="stylesheet" href="vanguard-ui.css?v=4" />
-    <script type="module" src="index.js?v=42"></script>
+    <link rel="stylesheet" href="vanguard-ui.css?v=8" />
+    <script type="module" src="index.js?v=52"></script>
   </body>
 </html>

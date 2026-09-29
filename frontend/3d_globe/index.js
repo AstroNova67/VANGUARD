@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "jsm/controls/OrbitControls.js";
 import getStarfield from "./src/getStarfield.js";
-import { addMarsMoons, addMeteorShowers } from "./src/marsSpaceFeatures.js";
+import { addMarsMoons, addMeteorShowers, addEarthFromMars } from "./src/marsSpaceFeatures.js";
 import { initAgentChat } from "./agent-chat.js";
 import {
   SUITABILITY_LEGEND,
@@ -173,6 +173,11 @@ const marsMoons = addMarsMoons(scene);
 const meteors = addMeteorShowers(scene);
 let _spaceLastT = performance.now();
 let _spaceT0 = performance.now();
+const _sunWorld = new THREE.Vector3();
+const _camDir = new THREE.Vector3();
+const _toSun = new THREE.Vector3();
+const _toMars = new THREE.Vector3();
+let sunGlareEnabled = true;
 
 // --- Sun Setup ---
 // From Mars (~1.5 AU) the solar disk is ~0.35° across (≈⅔ Earth size), near-white,
@@ -283,6 +288,59 @@ const sunMesh = buildSunFromMarsView();
 sunMesh.position.set(sunDistance, 0, 0);
 sunPivot.add(sunMesh);
 
+const earthFromMars = addEarthFromMars(sunPivot);
+
+const sunCorona = sunMesh.getObjectByName("sunCorona");
+const sunHalo = sunMesh.getObjectByName("sunHalo");
+const sunCoronaBaseScale = 2.4;
+const sunHaloBaseScale = 4.8;
+const sunCoronaBaseOpacity = 0.95;
+const sunHaloBaseOpacity = 0.7;
+
+/**
+ * Rotate the whole sun system (Sun + Earth + directional light).
+ * Local offsets stay fixed so relatives never drift when the angle slider moves.
+ */
+function setSunSystemAngle(rad, { syncSlider = true } = {}) {
+  // Normalize for stable slider values
+  let y = rad;
+  const twoPi = Math.PI * 2;
+  y = ((y % twoPi) + twoPi) % twoPi;
+  sunPivot.rotation.y = y;
+  // Keep sun/light on the +X axis of the pivot (Earth already orbits that axis in local space).
+  sunMesh.position.set(sunDistance, 0, 0);
+  sunLight.position.set(sunDistance, 0, 0);
+  if (syncSlider) {
+    const el = document.getElementById("sunAngle");
+    if (el && document.activeElement !== el) {
+      el.value = String(Math.round(THREE.MathUtils.radToDeg(y)));
+    }
+  }
+}
+
+/** Boost corona when looking near the Sun / Sun near Mars limb. */
+function updateSunGlare() {
+  if (!sunCorona || !sunHalo) return;
+  if (!sunGlareEnabled) {
+    sunCorona.scale.setScalar(sunCoronaBaseScale);
+    sunHalo.scale.setScalar(sunHaloBaseScale);
+    sunCorona.material.opacity = sunCoronaBaseOpacity;
+    sunHalo.material.opacity = sunHaloBaseOpacity;
+    return;
+  }
+  sunMesh.getWorldPosition(_sunWorld);
+  _toSun.copy(_sunWorld).sub(camera.position).normalize();
+  camera.getWorldDirection(_camDir);
+  const lookAtSun = Math.max(0, _camDir.dot(_toSun));
+  _toMars.set(0, 0, 0).sub(camera.position).normalize();
+  const sunNearLimb = Math.max(0, 1 - Math.abs(_toSun.dot(_toMars)));
+  const glare = Math.pow(lookAtSun, 10) * 0.85 + Math.pow(lookAtSun, 4) * sunNearLimb * 0.45;
+  sunCorona.scale.setScalar(sunCoronaBaseScale * (1 + glare * 1.8));
+  sunHalo.scale.setScalar(sunHaloBaseScale * (1 + glare * 2.4));
+  sunCorona.material.opacity = Math.min(1, sunCoronaBaseOpacity + glare * 0.35);
+  sunHalo.material.opacity = Math.min(1, sunHaloBaseOpacity + glare * 0.45);
+}
+
 // --- UI Controls ---
 function syncSunOrbitToggleUi() {
   const input = document.getElementById("toggleSun");
@@ -302,14 +360,76 @@ document.getElementById("toggleSun")?.addEventListener("change", (e) => {
 });
 
 document.getElementById("sunAngle")?.addEventListener("input", (e) => {
-  const angle = THREE.MathUtils.degToRad(e.target.value);
-  sunMesh.position.set(Math.cos(angle) * sunDistance, 0, Math.sin(angle) * sunDistance);
-  sunLight.position.copy(sunMesh.position);
+  const angle = THREE.MathUtils.degToRad(Number(e.target.value));
+  setSunSystemAngle(angle, { syncSlider: false });
   sunRotationEnabled = false;
   syncSunOrbitToggleUi();
 });
 
+setSunSystemAngle(0);
 syncSunOrbitToggleUi();
+
+/** Space / sky settings panel → starfield, moons, meteors, Earth, sun glare. */
+function applySpaceSkySettingsFromUi() {
+  const panel = document.getElementById("spaceSkySettings");
+  if (!panel) return;
+
+  const checked = (id, fallback = true) => {
+    const el = document.getElementById(id);
+    return el ? Boolean(el.checked) : fallback;
+  };
+  const exposureEl = document.getElementById("skyExposureMode");
+  const exposureMode = exposureEl?.value === "eye" ? "eye" : "cinematic";
+  const meteorRate = document.getElementById("skyMeteorRate")?.value === "demo" ? "demo" : "rare";
+
+  stars.userData.setSettings?.({
+    exposureMode,
+    mwBreathe: checked("skyMwBreathe"),
+    glitter: checked("skyGlitter"),
+    deepSky: checked("skyDeepSky"),
+  });
+  earthFromMars.setSettings?.({ earth: checked("skyEarth") });
+  meteors.setSettings?.({ meteors: checked("skyMeteors"), meteorRate });
+  marsMoons.setSettings?.({ moonCatchLight: checked("skyMoonCatchLight") });
+  sunGlareEnabled = checked("skySunGlare");
+
+  const rateRow = document.getElementById("skyMeteorRateRow");
+  if (rateRow) rateRow.hidden = !checked("skyMeteors");
+}
+
+function wireSpaceSkySettingsUi() {
+  const ids = [
+    "skyExposureMode",
+    "skyMwBreathe",
+    "skyGlitter",
+    "skyDeepSky",
+    "skyEarth",
+    "skyMeteors",
+    "skyMeteorRate",
+    "skyMoonCatchLight",
+    "skySunGlare",
+  ];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.addEventListener("change", applySpaceSkySettingsFromUi);
+    el.addEventListener("input", applySpaceSkySettingsFromUi);
+  }
+  document.getElementById("skySettingsReset")?.addEventListener("click", () => {
+    const exposure = document.getElementById("skyExposureMode");
+    if (exposure) exposure.value = "eye";
+    for (const id of ["skyMwBreathe", "skyGlitter", "skyDeepSky", "skyEarth", "skyMeteors", "skyMoonCatchLight", "skySunGlare"]) {
+      const el = document.getElementById(id);
+      if (el) el.checked = true;
+    }
+    const rate = document.getElementById("skyMeteorRate");
+    if (rate) rate.value = "rare";
+    applySpaceSkySettingsFromUi();
+  });
+  applySpaceSkySettingsFromUi();
+}
+
+wireSpaceSkySettingsUi();
 
 function formatPred(n, decimals = 2) {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return "—";
@@ -1055,12 +1175,20 @@ function animate() {
   const now = performance.now();
   const dt = Math.min(0.05, (now - _spaceLastT) / 1000);
   _spaceLastT = now;
-  marsMoons.update(dt);
+  sunMesh.getWorldPosition(_sunWorld);
+  _sunWorld.normalize();
+  marsMoons.update(dt, _sunWorld);
   meteors.update(dt);
-  stars.userData.update?.((now - _spaceT0) / 1000);
+  const tSec = (now - _spaceT0) / 1000;
+  stars.userData.update?.(tSec);
+  earthFromMars.update?.(tSec);
+  updateSunGlare();
   controls.update();
   renderer.render(scene, camera);
-  if (sunRotationEnabled) sunPivot.rotation.y += 0.002;
+  if (sunRotationEnabled) {
+    sunPivot.rotation.y += 0.002;
+    setSunSystemAngle(sunPivot.rotation.y);
+  }
 }
 animate();
 
@@ -2320,12 +2448,16 @@ function setJourneyStep(_step, _opts) {
 function updatePlaceSelectionUi(lat, lon, { rastersReady = false, progressText = null } = {}) {
   const guide = document.getElementById("placeEmptyGuide");
   const summary = document.getElementById("placeSelectionSummary");
-  const coordsEl = document.getElementById("placeSelectionCoords");
   const hint = document.getElementById("placeSelectionHint");
-  if (guide) guide.hidden = true;
+  const manualLatEl = document.getElementById("manualLat");
+  const manualLonEl = document.getElementById("manualLon");
   if (summary) summary.hidden = false;
-  if (coordsEl) {
-    coordsEl.textContent = `${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E`;
+  if (guide) guide.hidden = true;
+  if (manualLatEl && document.activeElement !== manualLatEl) {
+    manualLatEl.value = lat.toFixed(4);
+  }
+  if (manualLonEl && document.activeElement !== manualLonEl) {
+    manualLonEl.value = lon.toFixed(4);
   }
   if (hint) {
     if (typeof progressText === "string" && progressText) {
@@ -2340,9 +2472,11 @@ function updatePlaceSelectionUi(lat, lon, { rastersReady = false, progressText =
 
 function clearPlaceSelectionUi() {
   const guide = document.getElementById("placeEmptyGuide");
-  const summary = document.getElementById("placeSelectionSummary");
+  const hint = document.getElementById("placeSelectionHint");
   if (guide) guide.hidden = false;
-  if (summary) summary.hidden = true;
+  if (hint) {
+    hint.textContent = "Click Mars, pick a famous site, or type coords and press Enter.";
+  }
 }
 
 function renderCoordsLoading(lat, lon, progressText = null) {
@@ -2354,7 +2488,7 @@ function renderCoordsLoading(lat, lon, progressText = null) {
     typeof progressText === "string" && progressText
       ? progressText
       : "Loading GeoTIFF layers…";
-  coordsEl.innerHTML = `<p class="coords-placeholder">${escapeHtmlText(progress)}<br/>Lat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°</p>`;
+  coordsEl.innerHTML = `<p class="coords-placeholder">${escapeHtmlText(progress)}</p>`;
 }
 
 /**
@@ -2374,7 +2508,6 @@ function renderCoordsGrid({ lat, lon, rows, gapNote = null }) {
     ? `<p class="coords-gap-note">${escapeHtmlText(gapNote)}</p>`
     : "";
   coordsEl.innerHTML = `<div class="coords-grid-wrap">
-    <div class="coords-grid-meta">${lat.toFixed(2)}°N · ${lon.toFixed(2)}°E</div>
     <div class="coords-grid">${rowsHtml}</div>
     ${noteHtml}
   </div>`;

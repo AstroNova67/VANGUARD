@@ -1,20 +1,20 @@
 /* VANGUARD — dark glass UI (Apple-inspired). Loaded after inline base styles. */
 
 :root {
-  --vg-bg: rgba(12, 12, 14, 0.78);
-  --vg-bg-elevated: rgba(28, 28, 30, 0.94);
-  --vg-bg-card: rgba(255, 255, 255, 0.04);
-  --vg-border: rgba(255, 255, 255, 0.1);
-  --vg-border-strong: rgba(255, 255, 255, 0.18);
+  --vg-bg: rgba(12, 12, 14, 0.58);
+  --vg-bg-elevated: rgba(28, 28, 30, 0.82);
+  --vg-bg-card: rgba(255, 255, 255, 0.05);
+  --vg-border: rgba(255, 255, 255, 0.12);
+  --vg-border-strong: rgba(255, 255, 255, 0.2);
   --vg-text: rgba(255, 255, 255, 0.92);
-  --vg-text-secondary: rgba(255, 255, 255, 0.58);
-  --vg-text-tertiary: rgba(255, 255, 255, 0.38);
+  --vg-text-secondary: rgba(255, 255, 255, 0.62);
+  --vg-text-tertiary: rgba(255, 255, 255, 0.42);
   --vg-accent: #ff453a;
   --vg-accent-soft: rgba(255, 69, 58, 0.18);
   --vg-radius: 16px;
   --vg-radius-sm: 10px;
-  --vg-blur: saturate(180%) blur(20px);
-  --vg-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --vg-blur: saturate(180%) blur(22px);
+  --vg-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
 body {
@@ -300,22 +300,30 @@ body {
   border-radius: 10px;
   border: 1px solid var(--vg-border);
   background: rgba(0, 0, 0, 0.28);
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
-.place-selection__coords {
-  font-family: "DM Sans", system-ui, sans-serif;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-  color: var(--vg-text);
-  font-variant-numeric: tabular-nums;
+.place-selection .manual-coords-row {
+  margin-bottom: 8px !important;
 }
 
 .place-selection__hint {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 11px;
   color: var(--vg-text-secondary);
+  line-height: 1.45;
+}
+
+.place-selection__demo {
+  margin-top: 10px;
+}
+
+.place-selection__demo[hidden] {
+  display: none !important;
+}
+
+.place-selection__coords {
+  display: none;
 }
 
 /* Values grid */
@@ -535,6 +543,41 @@ body {
   color: #e8b878;
 }
 
+.sky-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sky-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sky-settings-row label {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  font-size: 12px;
+  color: var(--vg-text-secondary);
+}
+
+.sky-settings-select {
+  flex: 1;
+  min-width: 140px;
+  background: var(--vg-bg-elevated);
+  border: 1px solid var(--vg-border);
+  color: var(--vg-text);
+  border-radius: var(--vg-radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.sky-settings-actions {
+  margin-top: 4px;
+}
+
 /* —— Polish pass: black glass everywhere, consistent radius & spacing —— */
 :root {
   --vg-space: 12px;
@@ -542,11 +585,11 @@ body {
   --vg-space-lg: 16px;
   --vg-radius: 16px;
   --vg-radius-sm: 10px;
-  --vg-bg: rgba(10, 10, 12, 0.88);
-  --vg-bg-elevated: rgba(22, 22, 24, 0.96);
-  --vg-bg-card: rgba(255, 255, 255, 0.045);
-  --vg-border: rgba(255, 255, 255, 0.1);
-  --vg-border-strong: rgba(255, 255, 255, 0.16);
+  --vg-bg: rgba(10, 10, 12, 0.58);
+  --vg-bg-elevated: rgba(22, 22, 24, 0.78);
+  --vg-bg-card: rgba(255, 255, 255, 0.055);
+  --vg-border: rgba(255, 255, 255, 0.12);
+  --vg-border-strong: rgba(255, 255, 255, 0.18);
 }
 
 .vanguard-left-stack {
@@ -562,6 +605,8 @@ body {
   border-radius: var(--vg-radius) !important;
   box-shadow: var(--vg-shadow) !important;
   padding: var(--vg-space-lg) !important;
+  backdrop-filter: var(--vg-blur) !important;
+  -webkit-backdrop-filter: var(--vg-blur) !important;
 }
 
 .panel-section {
@@ -593,9 +638,7 @@ body {
 
 .control-card,
 .place-selection,
-.coords-empty-guide,
 .famous-sites-block,
-.manual-coords,
 .scoring-weights-panel {
   border-radius: var(--vg-radius-sm) !important;
 }
@@ -604,6 +647,21 @@ body {
   background: var(--vg-bg-card) !important;
   border: 1px solid var(--vg-border) !important;
   padding: 10px 12px !important;
+}
+
+.globe-surface-card {
+  gap: 6px !important;
+  padding: 10px 12px !important;
+}
+
+.globe-surface-card .overlay-toggle-hint:empty,
+#globeSurfaceStatus:empty {
+  display: none !important;
+}
+
+#coords {
+  white-space: normal !important;
+  margin-top: 12px !important;
 }
 
 /* Landing score card — match black UI, drop navy/amber glow */
@@ -697,7 +755,7 @@ body {
 
 .score-flow {
   border-color: var(--vg-border) !important;
-  background: rgba(0, 0, 0, 0.28) !important;
+  background: rgba(0, 0, 0, 0.18) !important;
 }
 
 .score-flow__chip[data-state="ready"] {
