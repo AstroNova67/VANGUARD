@@ -345,11 +345,13 @@ For **surface-temperature** NN/XGB **inputs**, the five **features** are built i
 
 ### Landing Score Interpretation
 
-- **90-100%**: Excellent landing site
-- **70-89%**: Good landing site
-- **50-69%**: Fair landing site
-- **30-49%**: Poor landing site
-- **0-29%**: Very poor landing site
+Bands are calibrated to the **live** `/predict` score distribution (famous sites top out near ~64%):
+
+- **60–100%**: Excellent landing site
+- **50–59%**: Good landing site
+- **35–49%**: Fair landing site
+- **20–34%**: Poor landing site
+- **0–19%**: Very poor landing site
 
 The scoring system is implemented in `backend/scoring.py` (`LandingSuitabilityScorer`) and is based on NASA/JPL engineering constraints. See `LANDING_SCORING_SOURCES.md` for detailed source citations.
 

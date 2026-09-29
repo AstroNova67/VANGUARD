@@ -72,28 +72,25 @@
         max-height: none;
         overflow-y: auto;
         overflow-x: auto;
-        background: rgba(6, 14, 26, 0.94);
-        padding: 14px 14px 16px;
-        border-radius: 14px;
-        border: 1px solid rgba(120, 175, 220, 0.35);
-        box-shadow:
-          0 8px 32px rgba(0, 0, 0, 0.55),
-          0 0 0 1px rgba(255, 200, 120, 0.08),
-          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        background: rgba(10, 10, 12, 0.9);
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
         scrollbar-width: thin;
-        scrollbar-color: rgba(120, 160, 200, 0.4) transparent;
+        scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
       }
 
       #controls::-webkit-scrollbar {
         width: 8px;
       }
       #controls::-webkit-scrollbar-thumb {
-        background: rgba(120, 160, 200, 0.35);
+        background: rgba(255, 255, 255, 0.18);
         border-radius: 4px;
       }
 
       .brand-block {
-        margin-bottom: 14px;
+        margin-bottom: 12px;
         padding-bottom: 12px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       }
@@ -134,7 +131,7 @@
       }
 
       .panel-section {
-        margin-top: 14px;
+        margin-top: 16px;
       }
 
       .panel-section:first-of-type {
@@ -144,9 +141,9 @@
       .panel-section-title {
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #6a9aba;
+        color: rgba(255, 255, 255, 0.38);
         margin-bottom: 8px;
       }
 
@@ -775,6 +772,95 @@
         color: #6d8a9c;
       }
 
+      .predict-hint--quiet {
+        margin-top: 4px;
+        font-size: 10px;
+        opacity: 0.85;
+      }
+
+      .score-flow {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 0 0 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.28);
+      }
+
+      .score-flow__chip {
+        display: inline-flex;
+        align-items: center;
+        align-self: flex-start;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #e8f0f7;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .score-flow__chip[data-state="waiting"] {
+        background: rgba(255, 255, 255, 0.08);
+        color: #9aa8b5;
+      }
+
+      .score-flow__chip[data-state="loading"] {
+        background: rgba(232, 192, 120, 0.18);
+        color: #e8c078;
+      }
+
+      .score-flow__chip[data-state="backend"] {
+        background: rgba(120, 175, 220, 0.18);
+        color: #9ec5e8;
+      }
+
+      .score-flow__chip[data-state="ready"] {
+        background: rgba(125, 206, 160, 0.2);
+        color: #7dcea0;
+      }
+
+      .score-flow__detail {
+        font-size: 12px;
+        line-height: 1.4;
+        color: #9aa8b5;
+      }
+
+      .panel-drawer-toggle {
+        display: none;
+        align-self: flex-start;
+        margin: 0;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(10, 10, 12, 0.92);
+        color: #e8f0f7;
+        font: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      }
+
+      .panel-drawer-toggle__show {
+        display: none;
+      }
+
+      .vanguard-left-stack--collapsed .panel-drawer-toggle__hide {
+        display: none;
+      }
+
+      .vanguard-left-stack--collapsed .panel-drawer-toggle__show {
+        display: inline;
+      }
+
+      .vanguard-left-stack--collapsed #controls {
+        display: none;
+      }
+
       .scoring-weights-panel {
         margin: 10px 0 12px;
         padding: 10px 12px;
@@ -864,33 +950,30 @@
 
       .pred-panel {
         margin-top: 0;
-        padding: 16px 14px 14px;
-        background: rgba(4, 12, 24, 0.97);
-        border: 1px solid rgba(230, 165, 85, 0.5);
-        border-radius: 12px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
         font-size: 12px;
         line-height: 1.5;
-        color: #b8d4e8;
-        box-shadow:
-          0 6px 28px rgba(0, 0, 0, 0.5),
-          0 0 0 1px rgba(255, 180, 90, 0.1),
-          0 0 24px rgba(230, 130, 50, 0.18);
+        color: rgba(255, 255, 255, 0.58);
+        box-shadow: none;
       }
 
       .pred-score-card {
         padding: 12px 14px;
-        margin: -4px -6px 14px;
+        margin: 0 0 12px;
         border-radius: 10px;
         background: rgba(0, 0, 0, 0.35);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       .pred-gap-compare {
-        margin: 10px 0 12px;
+        margin: 10px 0 0;
         padding: 10px 12px;
         border-radius: 8px;
-        border: 1px solid rgba(158, 201, 232, 0.28);
-        background: rgba(20, 40, 58, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.28);
       }
 
       .pred-gap-compare__row {
@@ -1447,13 +1530,11 @@
         min-width: 240px;
         display: flex;
         flex-direction: column;
-        background: rgba(6, 14, 26, 0.94);
-        border-radius: 14px;
-        border: 1px solid rgba(120, 175, 220, 0.35);
-        box-shadow:
-          0 8px 32px rgba(0, 0, 0, 0.55),
-          0 0 0 1px rgba(255, 200, 120, 0.08),
-          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        background: rgba(10, 10, 12, 0.9);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
         transition:
           transform 0.22s ease,
           opacity 0.22s ease,
@@ -1481,15 +1562,15 @@
         gap: 8px;
         padding: 10px 14px;
         margin-left: auto;
-        border: 1px solid rgba(120, 175, 220, 0.4);
-        border-radius: 10px 0 0 10px;
-        background: rgba(6, 14, 26, 0.96);
-        color: #9fd4ff;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        background: rgba(10, 10, 12, 0.94);
+        color: rgba(255, 255, 255, 0.9);
         font-size: 12px;
         font-weight: 700;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
         cursor: pointer;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
       }
 
       #agent-chat.agent-chat--minimized #agentChatToggle {
@@ -1516,10 +1597,10 @@
 
       .agent-chat-header h2 {
         margin: 0;
-        font-size: 13px;
-        font-weight: 800;
-        letter-spacing: 0.1em;
-        color: #9fd4ff;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.92);
       }
 
       .agent-chat-header-actions {
@@ -1789,10 +1870,27 @@
           max-height: calc(100vh - 24px);
         }
 
+        .panel-drawer-toggle {
+          display: inline-flex;
+        }
+
+        .vanguard-left-stack--collapsed {
+          bottom: auto;
+          max-height: none;
+          width: auto;
+          min-width: 0;
+        }
+
         #agent-chat:not(.agent-chat--minimized) {
-          width: min(280px, calc(100vw - 360px));
+          width: min(280px, calc(100vw - 24px));
           max-width: none;
           min-width: 0;
+          left: 12px;
+          right: 12px;
+        }
+
+        .pred-grid {
+          min-width: 420px;
         }
       }
     </style>
@@ -1812,7 +1910,18 @@
 
   </head>
   <body>
-    <div class="vanguard-left-stack">
+    <div class="vanguard-left-stack" id="vanguardLeftStack">
+    <button
+      type="button"
+      class="panel-drawer-toggle"
+      id="panelDrawerToggle"
+      aria-expanded="true"
+      aria-controls="controls"
+      title="Hide or show the control panel"
+    >
+      <span class="panel-drawer-toggle__hide">Hide panel</span>
+      <span class="panel-drawer-toggle__show">Show panel</span>
+    </button>
     <!-- 🌞 UI Controls for Sun + Data -->
     <div id="controls">
       <header class="brand-block">
@@ -1823,9 +1932,9 @@
       <section class="panel-section" aria-label="Pick a place">
         <div class="panel-section-title">Place</div>
         <div id="placeEmptyGuide" class="coords-empty-guide">
-          <p class="coords-empty-guide__lead">Click the globe, jump to a famous site, or try the Hellas gap-fill demo.</p>
+          <p class="coords-empty-guide__lead">Click the globe, jump to a famous site, or try a gap-fill demo (Hellas +Δ, or Gap-fill demo sites in the list).</p>
           <button type="button" class="btn-secondary" id="demoHellasBtn">
-            Demo: Hellas (gap-fill Δ)
+            Demo: Hellas (score rises after fill)
           </button>
         </div>
         <div id="placeSelectionSummary" class="place-selection" hidden>
@@ -1873,24 +1982,10 @@
       <section class="panel-section" aria-label="Layers at this point">
         <div class="panel-section-title">Layers at this point</div>
         <div class="control-card globe-surface-card">
-          <span class="globe-surface-label" id="globeSurfacePickerLabel">Drape on globe</span>
-          <div class="vg-picker" id="globeSurfacePicker">
-            <button
-              type="button"
-              class="vg-picker__trigger"
-              id="globeSurfacePickerTrigger"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-              aria-controls="globeSurfacePickerMenu"
-            >
-              <span class="vg-picker__label" id="globeSurfacePickerValue">Mars photo (default)</span>
-              <span class="vg-picker__chevron" aria-hidden="true">▾</span>
-            </button>
-            <ul class="vg-picker__menu" id="globeSurfacePickerMenu" role="listbox" hidden></ul>
-            <select id="globeSurfaceLayer" class="globe-surface-select" aria-hidden="true" tabindex="-1">
-              <option value="photo">Mars photo (default)</option>
-            </select>
-          </div>
+          <label class="globe-surface-label" for="globeSurfaceLayer">Drape on globe</label>
+          <select id="globeSurfaceLayer" class="globe-surface-select" aria-label="Drape layer on globe">
+            <option value="photo">Mars photo (default)</option>
+          </select>
           <p class="overlay-toggle-hint" id="globeSurfaceStatus" aria-live="polite"></p>
           <div id="globeRasterLegend" class="landing-overlay-legend" aria-hidden="true"></div>
         </div>
@@ -1901,11 +1996,17 @@
 
       <section class="panel-section" aria-label="Landing prediction">
         <div class="panel-section-title">Score</div>
-        <p class="predict-hint" id="apiModelsStatus" aria-live="polite">
-          Checking ML API (Keras + XGBoost on server)…
+        <div class="score-flow" id="scoreFlow" role="status" aria-live="polite">
+          <span class="score-flow__chip" id="scoreFlowChip" data-state="waiting">Pick a place</span>
+          <span class="score-flow__detail" id="scoreFlowDetail">Click Mars or choose a famous site.</span>
+        </div>
+        <p class="predict-hint predict-hint--quiet" id="apiModelsStatus" aria-live="polite">
+          Checking ML backend…
         </p>
-        <button type="button" id="predictLanding" style="display: none;">Run landing suitability</button>
-        <p class="predict-hint" id="predictHint" style="display: none">
+        <button type="button" id="predictLanding" disabled title="Pick a place on Mars first">
+          Run landing suitability
+        </button>
+        <p class="predict-hint" id="predictHint">
           Compares no fill / IDW / ML scores at this point (A · B · C).
         </p>
         <div id="landingScore"></div>
@@ -1949,18 +2050,21 @@
                 <label for="sunAngle">Sun angle</label>
                 <input id="sunAngle" type="range" min="0" max="360" value="0" aria-label="Sun angle" />
               </div>
+              <p class="overlay-toggle-hint">
+                Phobos &amp; Deimos orbit at real distances; moon sizes are exaggerated ~15× so you can see them. Distant sky smudges are deep-sky objects — not near Mars.
+              </p>
             </div>
           </section>
           <section class="panel-section" aria-label="Global batch map overlay">
             <div class="panel-section-title">Global batch map overlay</div>
             <div class="control-card overlay-toggle-card ml-suitability-overlay-card">
               <label class="overlay-toggle" for="landingMlOverlayToggle">
-                <input type="checkbox" id="landingMlOverlayToggle" aria-label="Show ML suitability GeoTIFF on the globe" />
-                <span>Show <code>mars_landing_suitability_ml.tif</code> (ML suitability, 0–100%)</span>
+                <input type="checkbox" id="landingMlOverlayToggle" aria-label="Show global ML suitability map on the globe" />
+                <span>Show global ML suitability map (0–100%)</span>
               </label>
               <p class="overlay-toggle-hint" id="landingOverlayStatus" aria-live="polite"></p>
               <p class="overlay-toggle-foot">
-                GPU-downscaled and ~55% blended with the base Mars photo. Selecting a globe layer turns this off.
+                Large first download (~265&nbsp;MB). Confirm before enabling during a live demo. Blended ~55% with the Mars photo; selecting a globe layer turns this off.
               </p>
               <div id="landingOverlayLegend" class="landing-overlay-legend" aria-hidden="true"></div>
             </div>
@@ -1974,8 +2078,8 @@
     <div id="mapLegendFloat" class="map-legend-float" aria-hidden="true"></div>
     </div>
 
-    <aside id="agent-chat" class="agent-chat" aria-label="Mars assistant chat">
-      <button type="button" id="agentChatToggle" aria-expanded="true" title="Open Mars assistant">
+    <aside id="agent-chat" class="agent-chat agent-chat--minimized" aria-label="Mars assistant chat">
+      <button type="button" id="agentChatToggle" aria-expanded="false" title="Open Mars assistant">
         <span aria-hidden="true">◀</span>
         <span>Assistant</span>
       </button>
@@ -2023,7 +2127,7 @@
     <!-- Load GeoTIFF as global -->
     <script src="https://unpkg.com/geotiff@2.1.3/dist-browser/geotiff.js"></script>
     <!-- Your Three.js script -->
-    <link rel="stylesheet" href="vanguard-ui.css?v=3" />
-    <script type="module" src="index.js?v=29"></script>
+    <link rel="stylesheet" href="vanguard-ui.css?v=4" />
+    <script type="module" src="index.js?v=42"></script>
   </body>
 </html>

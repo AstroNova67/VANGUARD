@@ -171,13 +171,20 @@ def predict_with_regression_models(
 
 
 def score_band_label(landing_score: float) -> str:
-    if landing_score >= 90:
+    """
+    Absolute bands calibrated to the live scorer's empirical range.
+
+    With current weights/norms, famous sites top out near ~64% (Meridiani), so the
+    old 70/90 cutoffs made essentially every site Fair or worse. Bands below match
+    observed score mass while keeping Excellent rare.
+    """
+    if landing_score >= 60:
         return "Excellent landing site"
-    if landing_score >= 70:
-        return "Good landing site"
     if landing_score >= 50:
+        return "Good landing site"
+    if landing_score >= 35:
         return "Fair landing site"
-    if landing_score >= 30:
+    if landing_score >= 20:
         return "Poor landing site"
     return "Very poor landing site"
 

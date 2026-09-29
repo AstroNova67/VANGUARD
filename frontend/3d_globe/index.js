@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "jsm/controls/OrbitControls.js";
 import getStarfield from "./src/getStarfield.js";
+import { addMarsMoons, addMeteorShowers } from "./src/marsSpaceFeatures.js";
 import { initAgentChat } from "./agent-chat.js";
 import {
   SUITABILITY_LEGEND,
@@ -53,16 +54,45 @@ function setApiModelsStatusMessage(text) {
   if (el) el.textContent = text;
 }
 
+/** Demo-friendly Score section chip: Pick a place → Loading → Ready. */
+function setScoreFlowStatus(state, detail) {
+  const chip = document.getElementById("scoreFlowChip");
+  const detailEl = document.getElementById("scoreFlowDetail");
+  const labels = {
+    waiting: "Pick a place",
+    loading: "Loading layers",
+    backend: "Waiting for backend",
+    ready: "Ready",
+  };
+  if (chip) {
+    chip.dataset.state = state;
+    chip.textContent = labels[state] ?? state;
+  }
+  if (detailEl && typeof detail === "string") {
+    detailEl.textContent = detail;
+  }
+}
+
 function syncPredictLandingButtonWithBackend() {
   const btn = document.getElementById("predictLanding");
-  if (!btn || btn.style.display === "none") return;
-  btn.disabled = !vanguardBackendModelsReady || !marsRastersReady;
-  if (!marsRastersReady) {
-    btn.title = "Click Mars (or Enter in lat/lon) to load rasters first.";
+  if (!btn) return;
+  btn.style.display = "block";
+  const hasPlace = Boolean(currentMarsData);
+  const ready = hasPlace && marsRastersReady && vanguardBackendModelsReady;
+  btn.disabled = !ready;
+
+  if (!hasPlace) {
+    btn.title = "Click Mars (or choose a famous site) first.";
+    setScoreFlowStatus("waiting", "Click Mars or choose a famous site.");
+  } else if (!marsRastersReady) {
+    btn.title = "Layers are still loading for this point.";
+    setScoreFlowStatus("loading", "Sampling GeoTIFF layers at this point…");
   } else if (!vanguardBackendModelsReady) {
-    btn.title = "Wait until the ML backend is ready (see status above).";
+    btn.title = "Wait until the ML backend is ready.";
+    setScoreFlowStatus("backend", "Layers ready — waiting for the ML backend…");
   } else {
-    btn.title = "Run POST /predict (Keras + XGB on server)";
+    btn.title = "Run landing suitability (A · B · C gap-fill compare)";
+    setScoreFlowStatus("ready", "Layers + backend ready — run a landing score.");
   }
 }
 
@@ -92,9 +122,8 @@ async function waitForVanguardMlBackend() {
           const reg = Number(j.regression_models_loaded ?? 0);
           vanguardBackendModelsReady = true;
           setApiModelsStatusMessage(
-            `ML backend ready — ${nn}/5 neural nets loaded` +
-              (reg > 0 ? `; XGB regression loaded for fusion.` : ` (XGB optional).`) +
-              ` Predict uses POST /predict.`
+            `Backend ready — ${nn}/5 neural nets` +
+              (reg > 0 ? `; XGB fusion loaded.` : `.`)
           );
           syncPredictLandingButtonWithBackend();
           return;
@@ -104,7 +133,7 @@ async function waitForVanguardMlBackend() {
       /* network or CORS */
     }
     setApiModelsStatusMessage(
-      "Waiting for ML backend (loading Keras models on server)… " +
+      "Waiting for ML backend… " +
         `Trying ${base}/health every ${intervalMs / 1000}s.`
     );
     await new Promise((res) => setTimeout(res, intervalMs));
@@ -124,6 +153,10 @@ const marsMaterial = new THREE.MeshPhongMaterial({ map: marsTexture });
 const marsSphere = new THREE.Mesh(marsGeometry, marsMaterial);
 scene.add(marsSphere);
 
+// Soft fill so the night limb isn't pure black against a colorful sky.
+const hemiLight = new THREE.HemisphereLight(0xb8c4ff, 0x3a2218, 0.18);
+scene.add(hemiLight);
+
 // Optional Wireframe
 const wireframe = new THREE.LineSegments(
   new THREE.EdgesGeometry(marsGeometry),
@@ -132,26 +165,121 @@ const wireframe = new THREE.LineSegments(
 // scene.add(wireframe); // Uncomment to display wireframe
 
 // --- Stars ---
-const stars = getStarfield({ numStars: 1000, fog: false });
+const stars = getStarfield({ numStars: 4200 });
 scene.add(stars);
 
+// --- Phobos & Deimos (orbits to scale; sizes exaggerated for visibility) ---
+const marsMoons = addMarsMoons(scene);
+const meteors = addMeteorShowers(scene);
+let _spaceLastT = performance.now();
+let _spaceT0 = performance.now();
+
 // --- Sun Setup ---
+// From Mars (~1.5 AU) the solar disk is ~0.35° across (≈⅔ Earth size), near-white,
+// with a soft corona. We exaggerate angular size slightly so it still reads in a demo.
 const sunPivot = new THREE.Object3D();
 scene.add(sunPivot);
 
 const sunDistance = 50;
 let sunRotationEnabled = true;
 
-const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+/** Radial gradient canvas → texture for corona / bloom sprites. */
+function makeSunGlowTexture({
+  inner = "rgba(255,252,245,1)",
+  mid = "rgba(255,210,140,0.45)",
+  outer = "rgba(255,160,60,0)",
+  size = 256,
+} = {}) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, inner);
+  g.addColorStop(0.22, mid);
+  g.addColorStop(0.55, "rgba(255,140,40,0.12)");
+  g.addColorStop(1, outer);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function buildSunFromMarsView() {
+  const group = new THREE.Group();
+  group.name = "sunFromMars";
+
+  // Photosphere: small hot disc (angular size ~0.55° here — readable, still Mars-ish).
+  const coreRadius = 0.22;
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(coreRadius, 48, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff6e8,
+      toneMapped: false,
+    })
+  );
+  core.name = "sunCore";
+  group.add(core);
+
+  // Soft limb glow hugging the disc.
+  const limb = new THREE.Mesh(
+    new THREE.SphereGeometry(coreRadius * 1.35, 32, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd089,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  limb.name = "sunLimb";
+  group.add(limb);
+
+  // Billboard corona — always faces the camera, additive soft bloom.
+  const coronaMat = new THREE.SpriteMaterial({
+    map: makeSunGlowTexture(),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    opacity: 0.95,
+    toneMapped: false,
+  });
+  const corona = new THREE.Sprite(coronaMat);
+  corona.scale.set(2.4, 2.4, 1);
+  corona.name = "sunCorona";
+  group.add(corona);
+
+  // Fainter outer halo for a hint of diffraction / dust in the scene.
+  const haloMat = new THREE.SpriteMaterial({
+    map: makeSunGlowTexture({
+      inner: "rgba(255,230,180,0.35)",
+      mid: "rgba(255,150,70,0.12)",
+      outer: "rgba(255,100,30,0)",
+    }),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    opacity: 0.7,
+    toneMapped: false,
+  });
+  const halo = new THREE.Sprite(haloMat);
+  halo.scale.set(4.8, 4.8, 1);
+  halo.name = "sunHalo";
+  group.add(halo);
+
+  return group;
+}
+
+// Slightly warm daylight — still reads as sunlight on Mars, not a sodium lamp.
+const sunLight = new THREE.DirectionalLight(0xfff2e0, 1.05);
 sunLight.position.set(sunDistance, 0, 0);
 sunLight.target.position.set(0, 0, 0);
 scene.add(sunLight.target);
 sunPivot.add(sunLight);
 
-const sunMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(0.5, 32, 32),
-  new THREE.MeshBasicMaterial({ color: 0xffff00 })
-);
+const sunMesh = buildSunFromMarsView();
 sunMesh.position.set(sunDistance, 0, 0);
 sunPivot.add(sunMesh);
 
@@ -618,7 +746,7 @@ function buildGapFillScoreCompareHtml(idwScore, unfilledScore, mlScore) {
   return `
     <div class="pred-gap-compare" role="group" aria-label="Three-arm gap-fill score comparison">
       ${row("A · No corrections", unfilledScore)}
-      ${row("B · Manual fill (IDW, globe)", idwScore)}
+      ${row("B · IDW fill (globe)", idwScore)}
       ${row("C · ML fill", mlScore)}
       ${deltaRow("Δ(B−A) IDW vs none", deltaBA)}
       ${deltaRow("Δ(C−A) ML vs none", deltaCA)}
@@ -728,16 +856,21 @@ async function predictLandingSuitability() {
           ? mlResult.landing_score
           : null;
       const score = result.landing_score;
-      let scoreBand = "high";
-      let scoreText = "Good";
-      if (score < 30) {
-        scoreBand = "low";
-        scoreText = "Poor";
-      } else if (score <= 50) {
+      // Match backend landing_predict.score_band_label (empirical calibration).
+      let scoreBand = "low";
+      let scoreText = "Very poor";
+      if (score >= 60) {
+        scoreBand = "high";
+        scoreText = "Excellent";
+      } else if (score >= 50) {
+        scoreBand = "high";
+        scoreText = "Good";
+      } else if (score >= 35) {
         scoreBand = "mid";
         scoreText = "Fair";
-      } else if (score >= 70) {
-        scoreText = "Excellent";
+      } else if (score >= 20) {
+        scoreBand = "mid";
+        scoreText = "Poor";
       }
 
       const gapCompareHtml = buildGapFillScoreCompareHtml(
@@ -817,71 +950,80 @@ async function predictLandingSuitability() {
       document.getElementById("landingScore").innerHTML = `
         <div class="pred-panel pred-panel--score-${scoreBand}">
           <div class="pred-score-card">
-            <div class="pred-score">Landing suitability: ${score}% <span class="pred-score-note">(${scoreText})</span></div>
-            ${gapCompareHtml}
-            <p class="pred-lead">Each row shows observed rasters, <strong>Neural</strong> (Keras), and <strong>XGB</strong> (temp &amp; TI). The landing % uses the ML columns only: <strong>Neural · in score</strong> or <strong>XGB · in score</strong> marks which value was used (slope, dust, and water always from Keras here). <strong>Δ</strong> = |model − raster| for comparison.</p>
-          </div>
-          ${baselineWarn}
-          <ul class="pred-legend" role="list" aria-label="Prediction table columns">
-            <li class="pred-legend__item">
-              <span class="pred-legend-dot pred-legend-dot--obs" aria-hidden="true"></span>
-              <span class="pred-legend__text"><strong>Raster</strong> — GeoTIFF sample at the click (observed).</span>
-            </li>
-            <li class="pred-legend__item">
-              <span class="pred-legend-dot pred-legend-dot--nn" aria-hidden="true"></span>
-              <span class="pred-legend__text"><strong>Neural</strong> — Keras outputs for comparison.</span>
-            </li>
-            <li class="pred-legend__item">
-              <span class="pred-legend-dot pred-legend-dot--xgb" aria-hidden="true"></span>
-              <span class="pred-legend__text"><strong>XGB</strong> — Regression where trained (temp &amp; TI).</span>
-            </li>
-            <li class="pred-legend__item">
-              <span class="pred-legend-dot pred-legend-dot--score" aria-hidden="true"></span>
-              <span class="pred-legend__text"><strong>In score</strong> — Amber highlight = value used in landing %.</span>
-            </li>
-          </ul>
-          <p class="pred-grid-scroll-hint" role="note">
-            <strong>Three columns</strong> (Raster · Neural · XGB). If Neural/XGB look missing, <strong>scroll this table horizontally</strong> — the grid is wider than the sidebar.
-          </p>
-          <div class="pred-grid-scroll">
-            <div class="pred-grid">
-              <div class="pred-col pred-col--obs">
-                <div class="pred-col-title pred-col-title--obs">
-                  <span class="pred-col-title-short">Raster</span>
-                  <span class="pred-col-title-long">Observed (raster)</span>
-                </div>
-                ${obsCol}
-              </div>
-              <div class="pred-col pred-col--nn">
-                <div class="pred-col-title pred-col-title--nn">
-                  <span class="pred-col-title-short">Neural</span>
-                  <span class="pred-col-title-long">Neural networks</span>
-                </div>
-                ${nnCol}
-              </div>
-              <div class="pred-col pred-col--xgb">
-                <div class="pred-col-title pred-col-title--xgb">
-                  <span class="pred-col-title-short">XGB</span>
-                  <span class="pred-col-title-long">Regression (XGB)</span>
-                </div>
-                ${regCol}
-              </div>
+            <div class="pred-score-hero">
+              <div class="pred-score-hero__value">${Number(score).toFixed(1)}%</div>
+              <div class="pred-score-hero__band">${scoreText}</div>
+              <p class="pred-score-hero__sub">Landing suitability at this point (B · IDW / globe layers)</p>
             </div>
+            ${gapCompareHtml}
           </div>
-          <details class="pred-details">
-            <summary>Scoring &amp; data notes</summary>
+          <details class="pred-details pred-details--tech">
+            <summary>Model details (Raster · Neural · XGB)</summary>
             <div class="pred-details-body">
-              <p class="pred-footnote">${foot}</p>
-              <p class="pred-footnote pred-footnote--raster">${footRaster}</p>
+              ${baselineWarn}
+              <p class="pred-lead">Each row shows observed rasters, <strong>Neural</strong> (Keras), and <strong>XGB</strong> (temp &amp; TI). The landing % uses the ML columns only: <strong>Neural · in score</strong> or <strong>XGB · in score</strong> marks which value was used. <strong>Δ</strong> = |model − raster|.</p>
+              <ul class="pred-legend" role="list" aria-label="Prediction table columns">
+                <li class="pred-legend__item">
+                  <span class="pred-legend-dot pred-legend-dot--obs" aria-hidden="true"></span>
+                  <span class="pred-legend__text"><strong>Raster</strong> — GeoTIFF sample at the click.</span>
+                </li>
+                <li class="pred-legend__item">
+                  <span class="pred-legend-dot pred-legend-dot--nn" aria-hidden="true"></span>
+                  <span class="pred-legend__text"><strong>Neural</strong> — Keras outputs.</span>
+                </li>
+                <li class="pred-legend__item">
+                  <span class="pred-legend-dot pred-legend-dot--xgb" aria-hidden="true"></span>
+                  <span class="pred-legend__text"><strong>XGB</strong> — Regression (temp &amp; TI).</span>
+                </li>
+                <li class="pred-legend__item">
+                  <span class="pred-legend-dot pred-legend-dot--score" aria-hidden="true"></span>
+                  <span class="pred-legend__text"><strong>In score</strong> — Amber = value used in landing %.</span>
+                </li>
+              </ul>
+              <p class="pred-grid-scroll-hint" role="note">
+                Scroll horizontally if Neural/XGB columns are clipped.
+              </p>
+              <div class="pred-grid-scroll">
+                <div class="pred-grid">
+                  <div class="pred-col pred-col--obs">
+                    <div class="pred-col-title pred-col-title--obs">
+                      <span class="pred-col-title-short">Raster</span>
+                      <span class="pred-col-title-long">Observed (raster)</span>
+                    </div>
+                    ${obsCol}
+                  </div>
+                  <div class="pred-col pred-col--nn">
+                    <div class="pred-col-title pred-col-title--nn">
+                      <span class="pred-col-title-short">Neural</span>
+                      <span class="pred-col-title-long">Neural networks</span>
+                    </div>
+                    ${nnCol}
+                  </div>
+                  <div class="pred-col pred-col--xgb">
+                    <div class="pred-col-title pred-col-title--xgb">
+                      <span class="pred-col-title-short">XGB</span>
+                      <span class="pred-col-title-long">Regression (XGB)</span>
+                    </div>
+                    ${regCol}
+                  </div>
+                </div>
+              </div>
+              <details class="pred-details">
+                <summary>Scoring &amp; data notes</summary>
+                <div class="pred-details-body">
+                  <p class="pred-footnote">${foot}</p>
+                  <p class="pred-footnote pred-footnote--raster">${footRaster}</p>
+                </div>
+              </details>
+              <div class="pred-raw">
+                <details>
+                  <summary>View request JSON (sent to the server)</summary>
+                  <pre>${rawSafe}</pre>
+                  <p class="pred-raw-hint">Exactly what <code>/predict</code> received.</p>
+                </details>
+              </div>
             </div>
           </details>
-          <div class="pred-raw">
-            <details>
-              <summary>View request JSON (sent to the server)</summary>
-              <pre>${rawSafe}</pre>
-              <p class="pred-raw-hint">Scroll inside the box if the payload is long. This is exactly what <code>/predict</code> received.</p>
-            </details>
-          </div>
         </div>
       `;
       updateScoreFloat(
@@ -901,6 +1043,7 @@ async function predictLandingSuitability() {
     clearScoreFloat();
   } finally {
     document.getElementById("predictLanding").disabled = false;
+    syncPredictLandingButtonWithBackend();
   }
 }
 
@@ -909,6 +1052,12 @@ document.getElementById("predictLanding")?.addEventListener("click", predictLand
 // --- Animate Loop ---
 function animate() {
   requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - _spaceLastT) / 1000);
+  _spaceLastT = now;
+  marsMoons.update(dt);
+  meteors.update(dt);
+  stars.userData.update?.((now - _spaceT0) / 1000);
   controls.update();
   renderer.render(scene, camera);
   if (sunRotationEnabled) sunPivot.rotation.y += 0.002;
@@ -1082,6 +1231,18 @@ const MARS_FAMOUS_LOCATIONS = [
   { id: "hellas", name: "Hellas Planitia (basin center)", lat: -42.0, lon: 70.0 },
   { id: "noctis", name: "Noctis Labyrinthus", lat: -7.0, lon: -97.0 },
   { id: "ascraeus", name: "Ascraeus Mons", lat: 11.2, lon: -104.1 },
+  {
+    id: "gap_demo_south",
+    name: "Gap-fill demo · large drop after fill",
+    lat: -50.864,
+    lon: 151.528,
+  },
+  {
+    id: "gap_demo_north",
+    name: "Gap-fill demo · IDW vs ML diverge",
+    lat: 33.63,
+    lon: 75.282,
+  },
 ];
 
 let currentDataset = null;
@@ -1299,39 +1460,6 @@ const GLOBE_SURFACE_OPTIONS = [
   ...Object.entries(marsDatasets).map(([key, meta]) => ({ value: key, label: meta.name })),
 ];
 
-function globeSurfaceLabelForValue(value) {
-  const hit = GLOBE_SURFACE_OPTIONS.find((o) => o.value === value);
-  return hit?.label ?? value;
-}
-
-function syncGlobeSurfacePickerUi(value) {
-  const labelEl = document.getElementById("globeSurfacePickerValue");
-  if (labelEl) labelEl.textContent = globeSurfaceLabelForValue(value);
-  const menu = document.getElementById("globeSurfacePickerMenu");
-  if (menu) {
-    for (const opt of menu.querySelectorAll(".vg-picker__option")) {
-      const selected = opt.dataset.value === value;
-      opt.setAttribute("aria-selected", selected ? "true" : "false");
-    }
-  }
-}
-
-function closeGlobeSurfacePicker() {
-  const trigger = document.getElementById("globeSurfacePickerTrigger");
-  const menu = document.getElementById("globeSurfacePickerMenu");
-  if (trigger) trigger.setAttribute("aria-expanded", "false");
-  if (menu) menu.hidden = true;
-}
-
-function toggleGlobeSurfacePicker() {
-  const trigger = document.getElementById("globeSurfacePickerTrigger");
-  const menu = document.getElementById("globeSurfacePickerMenu");
-  if (!trigger || !menu || trigger.disabled) return;
-  const open = trigger.getAttribute("aria-expanded") === "true";
-  trigger.setAttribute("aria-expanded", open ? "false" : "true");
-  menu.hidden = open;
-}
-
 function populateGlobeSurfaceSelect() {
   const sel = document.getElementById("globeSurfaceLayer");
   if (!sel) return;
@@ -1342,54 +1470,6 @@ function populateGlobeSurfaceSelect() {
     opt.textContent = label;
     sel.appendChild(opt);
   }
-  syncGlobeSurfacePickerUi(sel.value || "photo");
-}
-
-function initGlobeSurfacePicker() {
-  populateGlobeSurfaceSelect();
-  const picker = document.getElementById("globeSurfacePicker");
-  const trigger = document.getElementById("globeSurfacePickerTrigger");
-  const menu = document.getElementById("globeSurfacePickerMenu");
-  const sel = document.getElementById("globeSurfaceLayer");
-  if (!picker || !trigger || !menu || !sel) return;
-
-  menu.innerHTML = GLOBE_SURFACE_OPTIONS.map(
-    ({ value, label }) =>
-      `<li class="vg-picker__option" role="option" data-value="${value}" tabindex="-1">${label}</li>`
-  ).join("");
-  syncGlobeSurfacePickerUi(sel.value || "photo");
-
-  trigger.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleGlobeSurfacePicker();
-  });
-
-  menu.addEventListener("click", (e) => {
-    const opt = e.target.closest(".vg-picker__option");
-    if (!opt?.dataset.value) return;
-    void selectGlobeSurfaceLayer(opt.dataset.value);
-  });
-
-  menu.addEventListener("keydown", (e) => {
-    const options = [...menu.querySelectorAll(".vg-picker__option")];
-    const current = options.findIndex((o) => o.getAttribute("aria-selected") === "true");
-    if (e.key === "Escape") {
-      closeGlobeSurfacePicker();
-      trigger.focus();
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      const next = options[Math.min(current + 1, options.length - 1)] ?? options[0];
-      next?.click();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      const prev = options[Math.max(current - 1, 0)] ?? options[options.length - 1];
-      prev?.click();
-    }
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!picker.contains(e.target)) closeGlobeSurfacePicker();
-  });
 }
 
 async function deactivateMlOverlayForLayerChange() {
@@ -1411,12 +1491,10 @@ async function selectGlobeSurfaceLayer(val, { skipSelectSync = false } = {}) {
     else val = sel.value;
   }
   if (val !== "photo") priorGlobeSurfaceSelect = val;
-  syncGlobeSurfacePickerUi(val);
-  closeGlobeSurfacePicker();
   await applyGlobeSurfaceLayerSelect();
 }
 
-initGlobeSurfacePicker();
+populateGlobeSurfaceSelect();
 
 // Switch to a different dataset (legacy helper; globe drape uses applyGlobeSurfaceLayerSelect).
 async function switchDataset(datasetType) {
@@ -1842,7 +1920,6 @@ async function applyGlobeSurfaceLayerSelect() {
   if (val !== "photo") {
     priorGlobeSurfaceSelect = val;
   }
-  syncGlobeSurfacePickerUi(val);
 
   if (val === "photo") {
     marsMaterial.map = marsTexture;
@@ -1869,7 +1946,6 @@ async function applyGlobeSurfaceLayerSelect() {
   } catch (err) {
     console.error("Globe surface layer:", err);
     if (sel) sel.value = "photo";
-    syncGlobeSurfacePickerUi("photo");
     marsMaterial.map = marsTexture;
     marsMaterial.needsUpdate = true;
     if (statusEl) statusEl.textContent = "Could not load this layer (see console).";
@@ -2051,7 +2127,6 @@ document.getElementById("landingMlOverlayToggle")?.addEventListener("change", as
       const gSel = document.getElementById("globeSurfaceLayer");
       if (gSel) {
         gSel.value = priorGlobeSurfaceSelect;
-        syncGlobeSurfacePickerUi(gSel.value);
       }
     }
     const gs = document.getElementById("globeSurfaceStatus");
@@ -2065,6 +2140,24 @@ document.getElementById("landingMlOverlayToggle")?.addEventListener("change", as
     return;
   }
 
+  const alreadyCached =
+    Boolean(landingMlSuitabilityBlendedTexture) &&
+    landingMlSuitabilityTintRevisionBuilt === LANDING_SUITABILITY_TINT_REVISION &&
+    landingMlSuitabilityLoadedFromUrl === landingMlOverlayRequestUrl();
+
+  if (!alreadyCached) {
+    const ok = window.confirm(
+      "Load the global ML suitability map?\n\n" +
+        "First download is large (~265 MB uncompressed) and can take 1–3 minutes.\n" +
+        "Cancel if you are mid-demo and did not mean to enable this."
+    );
+    if (!ok) {
+      if (toggleEl) toggleEl.checked = false;
+      setStatus("Overlay cancelled — globe unchanged.");
+      return;
+    }
+  }
+
   const maxDim = Math.min(4096, renderer.capabilities.maxTextureSize);
 
   try {
@@ -2075,7 +2168,6 @@ document.getElementById("landingMlOverlayToggle")?.addEventListener("change", as
     if (!landingMlOverlaySessionActive && gSel) {
       priorGlobeSurfaceSelect = gSel.value;
       gSel.value = "photo";
-      syncGlobeSurfacePickerUi("photo");
       landingMlOverlaySessionActive = true;
     }
     const gsStat = document.getElementById("globeSurfaceStatus");
@@ -2086,7 +2178,9 @@ document.getElementById("landingMlOverlayToggle")?.addEventListener("change", as
       const url = landingMlOverlayRequestUrl();
       const basename = url.split("/").pop() || url;
       setStatus(
-        "Downloading mars_landing_suitability_ml.tif (~265 MB uncompressed; first load can take 1–3 min)…"
+        alreadyCached
+          ? "Applying cached ML suitability map…"
+          : "Downloading ML suitability map (~265 MB; first load can take 1–3 min)…"
       );
       const needRebuild =
         !landingMlSuitabilityBlendedTexture ||
@@ -2122,7 +2216,6 @@ document.getElementById("landingMlOverlayToggle")?.addEventListener("change", as
     const gSel = document.getElementById("globeSurfaceLayer");
     if (gSel) {
       gSel.value = priorGlobeSurfaceSelect;
-      syncGlobeSurfacePickerUi(gSel.value);
     }
     void applyGlobeSurfaceLayerSelect();
     setLandingOverlayLegend(false);
@@ -2224,7 +2317,7 @@ function setJourneyStep(_step, _opts) {
   // Journey tabs removed — single scrolling panel.
 }
 
-function updatePlaceSelectionUi(lat, lon, { rastersReady = false } = {}) {
+function updatePlaceSelectionUi(lat, lon, { rastersReady = false, progressText = null } = {}) {
   const guide = document.getElementById("placeEmptyGuide");
   const summary = document.getElementById("placeSelectionSummary");
   const coordsEl = document.getElementById("placeSelectionCoords");
@@ -2235,9 +2328,13 @@ function updatePlaceSelectionUi(lat, lon, { rastersReady = false } = {}) {
     coordsEl.textContent = `${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E`;
   }
   if (hint) {
-    hint.textContent = rastersReady
-      ? "Layers ready — drape a map or run Score below."
-      : "Sampling GeoTIFF layers…";
+    if (typeof progressText === "string" && progressText) {
+      hint.textContent = progressText;
+    } else {
+      hint.textContent = rastersReady
+        ? "Layers ready — drape a map or run Score below."
+        : "Sampling GeoTIFF layers…";
+    }
   }
 }
 
@@ -2248,12 +2345,16 @@ function clearPlaceSelectionUi() {
   if (summary) summary.hidden = true;
 }
 
-function renderCoordsLoading(lat, lon) {
+function renderCoordsLoading(lat, lon, progressText = null) {
   const coordsEl = document.getElementById("coords");
   if (!coordsEl) return;
   coordsEl.classList.remove("coords--empty");
   coordsEl.classList.add("coords--loading");
-  coordsEl.innerHTML = `<p class="coords-placeholder">Loading GeoTIFF layers…<br/>Lat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°</p>`;
+  const progress =
+    typeof progressText === "string" && progressText
+      ? progressText
+      : "Loading GeoTIFF layers…";
+  coordsEl.innerHTML = `<p class="coords-placeholder">${escapeHtmlText(progress)}<br/>Lat ${lat.toFixed(2)}°, Lon ${lon.toFixed(2)}°</p>`;
 }
 
 /**
@@ -2312,12 +2413,20 @@ function updateScoreFloat(idwScore, unfilledScore, mlScore) {
     ? formatLiveScoreDelta(unfilledScore, mlScore)
     : null;
   const parts = [];
-  if (cmpBA) parts.push(`<span class="score-float__delta ${cmpBA.cls}">IDW ${cmpBA.text}</span>`);
-  if (cmpCA) parts.push(`<span class="score-float__delta ${cmpCA.cls}">ML ${cmpCA.text}</span>`);
+  if (cmpBA) {
+    parts.push(
+      `<span class="score-float__delta ${cmpBA.cls}">IDW ${cmpBA.text}</span>`
+    );
+  }
+  if (cmpCA) {
+    parts.push(
+      `<span class="score-float__delta ${cmpCA.cls}">ML ${cmpCA.text}</span>`
+    );
+  }
   el.innerHTML = `
-    <span class="score-float__label">Score (IDW)</span>
+    <span class="score-float__label">Score</span>
     <span class="score-float__value">${Number(idwScore).toFixed(1)}%</span>
-    ${parts.join(" ")}
+    ${parts.join("")}
   `;
   el.hidden = false;
 }
@@ -2336,13 +2445,36 @@ function initJourneyUi() {
   });
 }
 
+function initPanelDrawerToggle() {
+  const stack = document.getElementById("vanguardLeftStack");
+  const toggle = document.getElementById("panelDrawerToggle");
+  if (!stack || !toggle) return;
+
+  const apply = (collapsed) => {
+    stack.classList.toggle("vanguard-left-stack--collapsed", collapsed);
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    toggle.title = collapsed ? "Show the control panel" : "Hide the control panel";
+  };
+
+  toggle.addEventListener("click", () => {
+    apply(!stack.classList.contains("vanguard-left-stack--collapsed"));
+  });
+
+  const mq = window.matchMedia("(max-width: 900px)");
+  const onViewport = () => {
+    if (!mq.matches) apply(false);
+  };
+  mq.addEventListener?.("change", onViewport);
+  onViewport();
+}
+
 async function runHellasGapFillDemo() {
   const hellas = MARS_FAMOUS_LOCATIONS.find((l) => l.id === "hellas");
   if (!hellas) return;
   frameCameraOnMarsLatLon(hellas.lat, hellas.lon);
   await loadMarsReadingsAtLatLon(hellas.lat, hellas.lon, null);
   const predBtn = document.getElementById("predictLanding");
-  if (predBtn && !predBtn.disabled && predBtn.style.display !== "none") {
+  if (predBtn && !predBtn.disabled) {
     await predictLandingSuitability();
   }
 }
@@ -2361,8 +2493,6 @@ function setMarsLocation(lat, lon, markerPoint) {
   updatePlaceSelectionUi(lat, lon, { rastersReady: false });
   renderCoordsPlaceholderGrid(lat, lon);
 
-  const predBtn = document.getElementById("predictLanding");
-  if (predBtn) predBtn.style.display = "block";
   syncPredictLandingButtonWithBackend();
   const hint = document.getElementById("predictHint");
   if (hint) hint.style.display = "block";
@@ -2382,8 +2512,12 @@ async function loadMarsReadingsAtLatLon(lat, lon, markerPoint) {
   lastLandingScorePercent = null;
   lastLandingScoreUnfilledPercent = null;
   lastLandingScoreMlPercent = null;
-  updatePlaceSelectionUi(lat, lon, { rastersReady: false });
-  renderCoordsLoading(lat, lon);
+  updatePlaceSelectionUi(lat, lon, {
+    rastersReady: false,
+    progressText: "Starting layer download…",
+  });
+  renderCoordsLoading(lat, lon, "Starting layer download…");
+  syncPredictLandingButtonWithBackend();
 
   const loadBtn = document.getElementById("applyManualLatLon");
   if (loadBtn) loadBtn.disabled = true;
@@ -2401,29 +2535,42 @@ async function loadMarsReadingsAtLatLon(lat, lon, markerPoint) {
   if (manualLonEl) manualLonEl.value = lon.toFixed(4);
 
   const datasetTypes = Object.keys(marsDatasets);
-  await Promise.all([
-    ...datasetTypes.map(async (datasetType) => {
+  const loadJobs = [
+    ...datasetTypes.map((datasetType) => ({
+      label: marsDatasets[datasetType]?.name ?? datasetType,
+      run: () => loadDataset(datasetType),
+    })),
+    ...GAP_FILLED_DATASET_TYPES.map((datasetType) => ({
+      label: `Unfilled ${marsDatasets[datasetType]?.name ?? datasetType}`,
+      run: () => loadUnfilledDataset(datasetType),
+    })),
+    ...GAP_FILLED_DATASET_TYPES.map((datasetType) => ({
+      label: `ML-filled ${marsDatasets[datasetType]?.name ?? datasetType}`,
+      run: () => loadMlFilledDataset(datasetType),
+    })),
+  ];
+  const totalJobs = loadJobs.length;
+  let completedJobs = 0;
+
+  const bumpProgress = () => {
+    completedJobs += 1;
+    const progressText = `Loading layers… ${completedJobs}/${totalJobs}`;
+    updatePlaceSelectionUi(lat, lon, { rastersReady: false, progressText });
+    renderCoordsLoading(lat, lon, progressText);
+    setScoreFlowStatus("loading", progressText);
+  };
+
+  await Promise.all(
+    loadJobs.map(async (job) => {
       try {
-        await loadDataset(datasetType);
+        await job.run();
       } catch (error) {
-        console.warn(`Failed to load ${marsDatasets[datasetType]?.name ?? datasetType}:`, error);
+        console.warn(`Failed to load ${job.label}:`, error);
+      } finally {
+        bumpProgress();
       }
-    }),
-    ...GAP_FILLED_DATASET_TYPES.map(async (datasetType) => {
-      try {
-        await loadUnfilledDataset(datasetType);
-      } catch (error) {
-        console.warn(`Failed to load unfilled ${datasetType}:`, error);
-      }
-    }),
-    ...GAP_FILLED_DATASET_TYPES.map(async (datasetType) => {
-      try {
-        await loadMlFilledDataset(datasetType);
-      } catch (error) {
-        console.warn(`Failed to load ML-filled ${datasetType}:`, error);
-      }
-    }),
-  ]);
+    })
+  );
 
   const allValues = datasetTypes.map((datasetType) => {
     const datasetInfo = marsDatasets[datasetType];
@@ -2493,8 +2640,6 @@ async function loadMarsReadingsAtLatLon(lat, lon, markerPoint) {
   marsRastersReady = true;
   updatePlaceSelectionUi(lat, lon, { rastersReady: true });
 
-  const predBtn = document.getElementById("predictLanding");
-  if (predBtn) predBtn.style.display = "block";
   syncPredictLandingButtonWithBackend();
   const hint = document.getElementById("predictHint");
   if (hint) hint.style.display = "block";
@@ -2568,6 +2713,8 @@ window.addEventListener("click", onMouseClick, false);
 
 initFamousMarsSitesSelect();
 initJourneyUi();
+initPanelDrawerToggle();
+syncPredictLandingButtonWithBackend();
 
 document.getElementById("applyManualLatLon")?.addEventListener("click", () => {
   void onApplyManualLatLon();
@@ -2656,7 +2803,7 @@ async function executeAgentUiActions(actions) {
       }
       if (a.runPrediction) {
         const predBtn = document.getElementById("predictLanding");
-        if (predBtn && predBtn.style.display !== "none" && !predBtn.disabled) {
+        if (predBtn && !predBtn.disabled) {
           await predictLandingSuitability();
         }
       }

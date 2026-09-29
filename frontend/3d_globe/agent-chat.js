@@ -115,7 +115,16 @@ export function initAgentChat(options) {
     }
   }
 
-  setMinimized(sessionStorage.getItem(STORAGE_MINIMIZED) === "1");
+  // Default minimized for demos; only expand if the user left it open last time.
+  setMinimized(sessionStorage.getItem(STORAGE_MINIMIZED) !== "0");
+
+  let wasNarrow = window.matchMedia("(max-width: 900px)").matches;
+  if (wasNarrow) setMinimized(true);
+  window.addEventListener("resize", () => {
+    const narrow = window.matchMedia("(max-width: 900px)").matches;
+    if (narrow && !wasNarrow) setMinimized(true);
+    wasNarrow = narrow;
+  });
 
   toggleBtn?.addEventListener("click", () => {
     setMinimized(!shell.classList.contains("agent-chat--minimized"));
@@ -184,10 +193,32 @@ export function initAgentChat(options) {
     if (ctx && Number.isFinite(ctx.lat) && Number.isFinite(ctx.lon)) {
       let extra = `\n\n[App context: user is focused on Mars at lat ${ctx.lat}°N, lon ${ctx.lon}°E`;
       if (Number.isFinite(ctx.landingScore)) {
-        extra += `; their last landing suitability score on the globe was ${ctx.landingScore}%`;
+        extra += `; Predict card B (IDW / globe) landing score=${ctx.landingScore}%`;
+      }
+      if (Number.isFinite(ctx.landingScoreUnfilled)) {
+        extra += `; A (no corrections)=${ctx.landingScoreUnfilled}%`;
+      }
+      if (Number.isFinite(ctx.landingScoreMl)) {
+        extra += `; C (ML fill)=${ctx.landingScoreMl}%`;
+      }
+      if (Number.isFinite(ctx.gapFillDelta)) {
+        extra += `; Δ(B−A)=${ctx.gapFillDelta >= 0 ? "+" : ""}${ctx.gapFillDelta}`;
+      }
+      if (Number.isFinite(ctx.gapFillDeltaMl)) {
+        extra += `; Δ(C−A)=${ctx.gapFillDeltaMl >= 0 ? "+" : ""}${ctx.gapFillDeltaMl}`;
+      }
+      if (
+        Number.isFinite(ctx.landingScore) &&
+        Number.isFinite(ctx.landingScoreMl)
+      ) {
+        const dCB = Number((ctx.landingScoreMl - ctx.landingScore).toFixed(2));
+        extra += `; Δ(C−B)=${dCB >= 0 ? "+" : ""}${dCB}`;
       }
       extra +=
-        ". If they ask about 'here' or this location, call focus_mars_coordinates or analyze_landing_site. If they ask to show a named site, call focus_mars_site.]";
+        ". Gap-fill: A=unfilled zeros, B=IDW maps (globe), C=ML/HGBR maps; Δ≈0 means no gap at this pixel (normal). " +
+        "Best demos: Hellas (+Δ), Viking 1 (−Δ), Meridiani (Δ≈0 control), gap_demo_south / gap_demo_north. " +
+        "If they ask about 'here' or this location, call focus_mars_coordinates or analyze_landing_site. " +
+        "If they ask to show a named site or gap-fill demo, call focus_mars_site.]";
       message += extra;
     }
     const payload = { message };

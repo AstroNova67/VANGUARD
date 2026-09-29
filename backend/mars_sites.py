@@ -29,6 +29,19 @@ MARS_FAMOUS_SITES: tuple[MarsSite, ...] = (
     MarsSite("hellas", "Hellas Planitia (basin center)", -42.0, 70.0),
     MarsSite("noctis", "Noctis Labyrinthus", -7.0, -97.0),
     MarsSite("ascraeus", "Ascraeus Mons", 11.2, -104.1),
+    # Gap-fill A/B/C demos (instrument zeros → large score Δ after fill)
+    MarsSite(
+        "gap_demo_south",
+        "Gap-fill demo (large drop after fill)",
+        -50.864,
+        151.528,
+    ),
+    MarsSite(
+        "gap_demo_north",
+        "Gap-fill demo (IDW vs ML diverge)",
+        33.630,
+        75.282,
+    ),
 )
 
 

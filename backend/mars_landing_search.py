@@ -12,8 +12,10 @@ from rasterio.enums import Resampling
 
 try:
     from backend.mars_raster import DATA_DIR, sample_mars_data_at
+    from backend.mars_sites import MARS_FAMOUS_SITES
 except ImportError:
     from mars_raster import DATA_DIR, sample_mars_data_at
+    from mars_sites import MARS_FAMOUS_SITES
 
 SUITABILITY_FILENAME = "mars_landing_suitability_ml.tif"
 
@@ -72,6 +74,11 @@ def _top_map_candidates(
     return candidates
 
 
+def _famous_site_seeds() -> list[tuple[float, float, float]]:
+    """Always re-score curated sites — ML map peaks can disagree with live /predict."""
+    return [(s.lat, s.lon, float("nan")) for s in MARS_FAMOUS_SITES]
+
+
 def _contributions_from_breakdown(
     score_breakdown: dict[str, Any] | None,
     *,
@@ -99,46 +106,65 @@ def find_best_landing_site(
     *,
     data_dir: str | None = None,
     map_candidates: int = 24,
-    rescore_limit: int = 14,
+    rescore_limit: int = 40,
     stride: int = 12,
 ) -> dict[str, Any]:
     """
-    Pick the best landing site by re-scoring ML-map candidate peaks with predict_fn
-    (uses the caller's active scoring weights).
+    Pick the best landing site by re-scoring ML-map peaks **and** famous sites
+    with predict_fn (uses the caller's active scoring weights).
+
+    Famous sites are always included because the archived suitability GeoTIFF can
+    disagree with the live gap-filled /predict pipeline (map may show ~68% while
+    live score is ~54%).
     """
     path = _suitability_path(data_dir)
-    if not os.path.isfile(path):
+    candidates: list[tuple[float, float, float]] = []
+    if os.path.isfile(path):
+        candidates.extend(
+            _top_map_candidates(
+                path=path,
+                count=map_candidates,
+                stride=stride,
+                suppress_radius=3,
+            )
+        )
+    candidates.extend(_famous_site_seeds())
+
+    # De-dupe near-identical lat/lon (keep first = prefer map peak metadata when tied)
+    seen: list[tuple[float, float]] = []
+    unique: list[tuple[float, float, float]] = []
+    for lat, lon, ml_score in candidates:
+        if any(abs(lat - a) < 0.15 and abs(lon - b) < 0.15 for a, b in seen):
+            continue
+        seen.append((lat, lon))
+        unique.append((lat, lon, ml_score))
+
+    if not unique:
         return {
             "success": False,
-            "error": f"Missing {SUITABILITY_FILENAME}. Run batch_global_landing_suitability.py first.",
+            "error": (
+                f"No candidates. Need {SUITABILITY_FILENAME} and/or famous sites. "
+                "Run batch_global_landing_suitability.py if the map is missing."
+            ),
         }
 
-    candidates = _top_map_candidates(
-        path=path,
-        count=map_candidates,
-        stride=stride,
-        suppress_radius=3,
-    )
-    if not candidates:
-        return {"success": False, "error": "No valid suitability pixels in ML map."}
-
     scored: list[dict[str, Any]] = []
-    for lat, lon, ml_score in candidates[:rescore_limit]:
+    for lat, lon, ml_score in unique[:rescore_limit]:
         mars_data = sample_mars_data_at(lat, lon, data_dir=data_dir)
         result = predict_fn(mars_data)
         if not result.get("success"):
             continue
-        scored.append(
-            {
-                "latitude": lat,
-                "longitude": lon,
-                "ml_map_score_percent": round(ml_score, 2),
-                "landing_score_percent": result.get("landing_score"),
-                "interpretation": result.get("score_interpretation"),
-                "score_breakdown": result.get("score_breakdown"),
-                "scoring_weights_percent": result.get("scoring_weights_percent"),
-            }
-        )
+        entry: dict[str, Any] = {
+            "latitude": lat,
+            "longitude": lon,
+            "landing_score_percent": result.get("landing_score"),
+            "interpretation": result.get("score_interpretation"),
+            "score_breakdown": result.get("score_breakdown"),
+            "scoring_weights_percent": result.get("scoring_weights_percent"),
+        }
+        if ml_score == ml_score:  # not NaN
+            entry["ml_map_score_percent"] = round(float(ml_score), 2)
+        scored.append(entry)
 
     if not scored:
         return {"success": False, "error": "Could not score any candidate locations."}
@@ -155,10 +181,18 @@ def find_best_landing_site(
             "interpretation": best["interpretation"],
             "region_description": (
                 f"Mars {best['latitude']:.2f}°N, {best['longitude']:.2f}°E "
-                f"(global ML-map search, {len(scored)} candidates re-scored)"
+                f"(live re-score of {len(scored)} candidates: ML-map peaks + famous sites)"
             ),
             "top_contributions": _contributions_from_breakdown(best.get("score_breakdown")),
             "ml_map_score_percent": best.get("ml_map_score_percent"),
+            "runner_up_scores": [
+                {
+                    "latitude": r["latitude"],
+                    "longitude": r["longitude"],
+                    "landing_score_percent": r["landing_score_percent"],
+                }
+                for r in scored[1:4]
+            ],
         },
         "scoring_weights_percent": weights,
         "candidates_evaluated": len(scored),

@@ -79,6 +79,32 @@ You are the VANGUARD Mars landing-site assistant.
 VANGUARD samples Mars GeoTIFFs at lat/lon, runs ML models, and computes a landing suitability % using
 weighted slope, dust, surface temperature, thermal inertia, and water. Custom scoring_weights come from the UI.
 
+Gap-fill experiment (Predict card A / B / C):
+- A · No corrections = instrument zeros left as 0 (data_gap_unfilled).
+- B · Manual fill = IDW+gaussian (data_gap_filled; globe default maps).
+- C · ML fill = HistGradientBoosting imputers (data_gap_ml_filled).
+Same /predict scorer for all three; only gap-layer inputs change (ferric, albedo, roughness, temp range, elevation).
+Δ≈0 at most clicks is NORMAL — those pixels had no gap. Large Δ means zeros were lying at that point.
+B and C usually agree closely (mean Δ(C−B) ≈ 0); the interesting contrast is A vs filled.
+
+Score bands (absolute % — calibrated to live /predict; do not use old 70/90 cutoffs):
+- ≥60 Excellent · ≥50 Good · ≥35 Fair · ≥20 Poor · else Very poor.
+Meridiani (~64%) is currently among the highest famous scores (Excellent under these bands).
+find_best_landing_region re-scores ML-map peaks **and** famous sites with live models — prefer its
+landing_score_percent over any stale ml_map_score_percent. If map % and live % disagree, trust live.
+Do not invent scores above what tools return.
+
+Best demos when the user asks where to see gap-fill effects (use focus_mars_site / focus_mars_coordinates):
+- Hellas (hellas): fill RAISES score (~34% → ~44%, Δ≈+9.7) — best positive story.
+- Viking 1 (viking1): fill DROPS score (~57% → ~46%, Δ≈−11.5) — zeros inflated unfilled.
+- Gusev (gusev): modest rise (~+3.3).
+- Jezero / Gale: small drops (~−3 to −4) — near-control with feather edge.
+- Meridiani / Pathfinder / Phoenix: Δ≈0 control (sanity check).
+- gap_demo_south (−50.86°N, 151.53°E): huge drop (~64% → ~29%) — classic fake-high from zeros.
+- gap_demo_north (33.63°N, 75.28°E): large drop; IDW vs ML diverge a few points.
+
+If the user asks why A/B/C match, explain no gap at that pixel. If they ask for a demo tour, send them to Hellas then a gap_demo_* site, then Meridiani as control.
+If they ask why “best” is only Fair, explain relative search + conservative bands; offer Meridiani or compare_landing_sites.
 Tools (always use tools for scores — never invent numbers):
 - find_best_landing_region: when the user wants a good landing **region** or **site** without naming a mission.
   Returns ONE globally best candidate (ML map search + re-score with active weights). Do NOT answer with a list of
@@ -568,12 +594,26 @@ def find_best_landing_region() -> str:
     """
     Search the global ML suitability map for strong candidates, re-score with current scoring weights,
     and return the single best latitude/longitude. Use when the user asks for a good landing region
-  (not a tour of famous mission sites). Moves the globe to the result.
+    (not a tour of famous mission sites). Moves the globe to the result.
+
+    The returned score is often in the Fair band (50–69%) — that is the relative best among candidates,
+    not an Excellent (≥90) claim. Say so clearly in summary.
     """
     out = find_best_landing_site(_run_prediction)
     if not out.get("success"):
         return json.dumps(out)
     best = out["best"]
+    score = best.get("landing_score_percent")
+    band = best.get("interpretation") or (
+        score_band_label(float(score)) if score is not None else None
+    )
+    best["interpretation"] = band
+    best["note"] = (
+        "Relative best by live /predict among ML-map peaks + famous sites. "
+        "Bands: ≥60 Excellent, ≥50 Good, ≥35 Fair, ≥20 Poor. "
+        "Trust landing_score_percent over ml_map_score_percent when they differ."
+    )
+    out["best"] = best
     _queue_ui_action(
         {
             "type": "focus",
